@@ -56,8 +56,8 @@ export default function App() {
     { tableNumber: 'Delivery Client', rating: 4, comment: 'Chicken was spiced perfectly. Service was super quick.', timestamp: '18/07/2026' }
   ]);
 
-  const [restaurantName, setRestaurantName] = useState('Forest Bistro');
-  const [tagline, setTagline] = useState('Crafted Flavors. Elegant Moments.');
+  const [restaurantName, setRestaurantName] = useState('Abbuu Coffee');
+  const [tagline, setTagline] = useState('Scan the QR code to explore our digital menu.');
 
   // Routing: isAdmin decides if we render merchant console or customer menu
   const [isAdmin, setIsAdmin] = useState(false);
@@ -84,17 +84,17 @@ export default function App() {
   // Update default names if theme changes
   useEffect(() => {
     if (activeTheme === 'forest') {
-      setRestaurantName('Forest Bistro');
-      setTagline('Crafted Flavors. Elegant Moments.');
+      setRestaurantName('Abbuu Coffee');
+      setTagline('Scan the QR code to explore our digital menu.');
     } else if (activeTheme === 'amber') {
-      setRestaurantName('Amber Cafe');
-      setTagline('Where Every Sip Feels Like Home.');
+      setRestaurantName('Abbuu Coffee');
+      setTagline('Fresh pours, cozy corners, and a seamless digital menu.');
     } else if (activeTheme === 'midnight') {
-      setRestaurantName('Midnight Grill');
-      setTagline('Indulge in Smoked Culinary Masterpieces.');
+      setRestaurantName('Abbuu Coffee');
+      setTagline('Sip, scan, and settle in with a modern cafe experience.');
     } else if (activeTheme === 'blossom') {
-      setRestaurantName('Blossom Cafe');
-      setTagline('Baking Sweet Moments, Every Single Day.');
+      setRestaurantName('Abbuu Coffee');
+      setTagline('A bright coffeehouse experience from your phone.');
     }
   }, [activeTheme]);
 

@@ -34,6 +34,7 @@ export default function CustomerMenu({
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   const [showCallWaiterModal, setShowCallWaiterModal] = useState(false);
+  const [showQrWelcomeModal, setShowQrWelcomeModal] = useState(false);
   const [waiterReason, setWaiterReason] = useState('Assistance');
   const [waiterAlertSent, setWaiterAlertSent] = useState(false);
 
@@ -51,6 +52,23 @@ export default function CustomerMenu({
       setOrderType('dine-in');
     }
   }, [initialTable]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const hasSeenQrWelcome = window.localStorage.getItem('abbuu-qr-welcome-seen');
+    if (!hasSeenQrWelcome && !initialTable && !window.location.search.includes('admin=true')) {
+      const timer = window.setTimeout(() => setShowQrWelcomeModal(true), 700);
+      return () => window.clearTimeout(timer);
+    }
+  }, [initialTable]);
+
+  const handleQrWelcomeClose = () => {
+    setShowQrWelcomeModal(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('abbuu-qr-welcome-seen', 'true');
+    }
+  };
 
   const renderIcon = (name, className = "w-4 h-4") => {
     const IconComponent = Icons[name] || Icons.HelpCircle;
@@ -340,6 +358,13 @@ export default function CustomerMenu({
         <p className="text-xs italic text-text-secondary leading-relaxed">
           {tagline}
         </p>
+      </div>
+
+      <div className="px-6 mt-4">
+        <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-left">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">Digital Menu</p>
+          <p className="text-sm font-semibold text-text-primary mt-1">Scan the table QR code to browse the menu from your phone.</p>
+        </div>
       </div>
 
       {/* Categories Horizontal Carousel */}
@@ -851,6 +876,49 @@ export default function CustomerMenu({
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {showQrWelcomeModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[180] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-bg-secondary border border-border-color rounded-[28px] p-6 w-full max-w-sm shadow-2xl text-center text-text-primary">
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+              {renderIcon("QrCode", "w-8 h-8")}
+            </div>
+            <h3 className="text-xl font-black tracking-tight">Welcome to Abbuu Coffee</h3>
+            <p className="text-sm text-text-secondary mt-2 leading-relaxed">
+              This is a touchless digital menu. Scan the table QR code to begin browsing our coffeehouse favorites.
+            </p>
+
+            <div className="mt-5 text-left">
+              <label className="text-[10px] uppercase font-bold text-text-secondary">Optional table number</label>
+              <input
+                type="number"
+                placeholder="e.g. 4"
+                value={tableNumber}
+                onChange={(e) => setTableNumber(e.target.value)}
+                className="w-full mt-1.5 border border-border-color bg-bg-tertiary rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                type="button"
+                onClick={handleQrWelcomeClose}
+                className="flex-1 py-3 text-sm font-bold rounded-xl border border-border-color text-text-secondary hover:bg-bg-tertiary"
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                onClick={handleQrWelcomeClose}
+                className="flex-1 py-3 text-sm font-bold rounded-xl text-white hover:brightness-110"
+                style={{ backgroundColor: 'var(--primary)' }}
+              >
+                I scanned it
+              </button>
+            </div>
           </div>
         </div>
       )}
