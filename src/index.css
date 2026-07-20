@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-light: var(--text-light);
+  --color-border-color: var(--border-color);
+  --font-heading: 'Outfit', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+:root {
+  /* Default: Forest Bistro Theme */
+  --primary: #0f5132;
+  --primary-hover: #146c43;
+  --primary-rgb: 15, 81, 50;
+  --accent: #d4af37;
+  --accent-rgb: 212, 175, 55;
+  --bg-primary: #f4efe6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eae3d2;
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-light: #ffffff;
+  --border-color: #e5e7eb;
+}
+
+/* Theme 1: Forest Bistro (Default / Emerald & Gold) */
+.theme-forest {
+  --primary: #0f5132;
+  --primary-hover: #146c43;
+  --primary-rgb: 15, 81, 50;
+  --accent: #d4af37;
+  --accent-rgb: 212, 175, 55;
+  --bg-primary: #f4efe6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eae3d2;
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --border-color: #e5e7eb;
+}
+
+/* Theme 2: Amber Bistro (Warm Orange & Charcoal) */
+.theme-amber {
+  --primary: #ff9f1c;
+  --primary-hover: #e0850d;
+  --primary-rgb: 255, 159, 28;
+  --accent: #2ec4b6;
+  --accent-rgb: 46, 196, 182;
+  --bg-primary: #fbf7f0;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0e6d2;
+  --text-primary: #111827;
+  --text-secondary: #555e6c;
+  --border-color: #ebdcb9;
+}
+
+/* Theme 3: Midnight Luxury (Sleek Dark & Crimson/Gold) */
+.theme-midnight {
+  --primary: #e63946;
+  --primary-hover: #c92a35;
+  --primary-rgb: 230, 57, 70;
+  --accent: #ffb703;
+  --accent-rgb: 255, 183, 3;
+  --bg-primary: #0c0d12;
+  --bg-secondary: #171923;
+  --bg-tertiary: #1f2232;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --border-color: #2d3142;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Theme 4: Blossom Cafe (Soft Pink & Sage) */
+.theme-blossom {
+  --primary: #d46a7d;
+  --primary-hover: #c05265;
+  --primary-rgb: 212, 106, 125;
+  --accent: #81b29a;
+  --accent-rgb: 129, 178, 154;
+  --bg-primary: #fdf8f9;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f9eff1;
+  --text-primary: #3d303b;
+  --text-secondary: #6e5e6b;
+  --border-color: #f0dfe3;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.2);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.4);
+}
+
+/* Print Layout Optimization for Table Tent QR */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
