@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as Icons from 'lucide-react';
 import ItemDetailModal from './ItemDetailModal';
+import LanguageSelector from './LanguageSelector';
+import { useLanguage } from '../context/LanguageContext';
 import { dishImagesMap } from '../data/initialMenu';
 
 export default function CustomerMenu({ 
   menu, 
   categories, 
-  theme, 
   onPlaceOrder, 
   onCallWaiter, 
   onSubmitFeedback, 
   initialTable,
   restaurantName,
-  tagline,
   onToggleAdmin
 }) {
+  const { t, getLocalizedItem } = useLanguage();
+  const localizedMenu = menu.map(getLocalizedItem);
   const [selectedCategory, setSelectedCategory] = useState('starters');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -25,17 +27,18 @@ export default function CustomerMenu({
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [animateCart, setAnimateCart] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   // Checkout type states
   const [orderType, setOrderType] = useState('dine-in'); // 'dine-in' | 'delivery'
-  const [tableNumber, setTableNumber] = useState(initialTable || '');
+  const [tableNumber, setTableNumber] = useState(initialTable || '04');
   const [deliveryName, setDeliveryName] = useState('');
   const [deliveryPhone, setDeliveryPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
   const [showCallWaiterModal, setShowCallWaiterModal] = useState(false);
   const [showQrWelcomeModal, setShowQrWelcomeModal] = useState(false);
-  const [waiterReason, setWaiterReason] = useState('Assistance');
+  const [waiterReason, setWaiterReason] = useState('general');
   const [waiterAlertSent, setWaiterAlertSent] = useState(false);
 
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -43,7 +46,9 @@ export default function CustomerMenu({
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
-  const [activeHeaderOverlay, setActiveHeaderOverlay] = useState(null); // 'location' | 'phone' | 'whatsapp' | null
+  const [copiedMessage, setCopiedMessage] = useState(false);
+  const [orderSuccessModal, setOrderSuccessModal] = useState(false);
+
   const categoryRefs = useRef({});
 
   useEffect(() => {
@@ -56,9 +61,9 @@ export default function CustomerMenu({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const hasSeenQrWelcome = window.localStorage.getItem('abbuu-qr-welcome-seen');
+    const hasSeenQrWelcome = window.localStorage.getItem('abu-coffee-welcome-seen');
     if (!hasSeenQrWelcome && !initialTable && !window.location.search.includes('admin=true')) {
-      const timer = window.setTimeout(() => setShowQrWelcomeModal(true), 700);
+      const timer = window.setTimeout(() => setShowQrWelcomeModal(true), 600);
       return () => window.clearTimeout(timer);
     }
   }, [initialTable]);
@@ -66,13 +71,58 @@ export default function CustomerMenu({
   const handleQrWelcomeClose = () => {
     setShowQrWelcomeModal(false);
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('abbuu-qr-welcome-seen', 'true');
+      window.localStorage.setItem('abu-coffee-welcome-seen', 'true');
     }
   };
 
   const renderIcon = (name, className = "w-4 h-4") => {
     const IconComponent = Icons[name] || Icons.HelpCircle;
     return <IconComponent className={className} />;
+  };
+
+  // Helper to count total quantity of a menu item currently in cart
+  const getItemQuantityInCart = (itemId) => {
+    return cart
+      .filter(item => item.id === itemId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  };
+
+  // Inline Quick Add [ + ] button directly from the card
+  const handleInlineAdd = (item, e) => {
+    if (e) e.stopPropagation();
+
+    // Check if an entry for this item already exists in cart
+    const existingIndex = cart.findIndex(i => i.id === item.id);
+    if (existingIndex > -1) {
+      updateCartQty(existingIndex, 1);
+    } else {
+      // Add as new item with default selections if any
+      const defaultSelections = {};
+      if (item.customizations) {
+        item.customizations.forEach(cust => {
+          if (cust.type === 'single' && cust.options && cust.options[0]) {
+            defaultSelections[cust.name] = cust.options[0];
+          }
+        });
+      }
+
+      addToCart({
+        ...item,
+        quantity: 1,
+        selectedCustomizations: defaultSelections,
+        finalUnitPrice: item.price,
+        finalTotalPrice: item.price
+      });
+    }
+  };
+
+  // Inline Quick Subtract [ - ] button directly from the card
+  const handleInlineSubtract = (item, e) => {
+    if (e) e.stopPropagation();
+    const existingIndex = cart.findIndex(i => i.id === item.id);
+    if (existingIndex > -1) {
+      updateCartQty(existingIndex, -1);
+    }
   };
 
   const addToCart = (customizedItem) => {
@@ -109,17 +159,12 @@ export default function CustomerMenu({
   };
 
   const getSubtotal = () => cart.reduce((acc, curr) => acc + curr.finalTotalPrice, 0);
+  const getTotalItemsCount = () => cart.reduce((acc, curr) => acc + curr.quantity, 0);
 
-  const romanticOffer = {
-    threshold: 60,
-    title: "Romantic Dining Offer",
-    desc: "Spend $60 to unlock 1 complimentary dessert + 1 mocktail"
-  };
   const subtotal = getSubtotal();
-  const romanticProgressPercent = Math.min(100, (subtotal / romanticOffer.threshold) * 100);
-  const romanticOfferUnlocked = subtotal >= romanticOffer.threshold;
+  const totalItemsCount = getTotalItemsCount();
 
-  const filteredMenu = menu.filter(item => {
+  const filteredMenu = localizedMenu.filter(item => {
     if (item.category !== selectedCategory) return false;
     
     if (searchQuery) {
@@ -131,31 +176,68 @@ export default function CustomerMenu({
     }
 
     if (filterVegOnly) {
-      const isVeg = item.tags.some(tag => tag.toLowerCase().includes('vegetarian') || tag.toLowerCase().includes('vegan'));
+      const isVeg = item.tags.some(tag => /vegetarian|vegan|vegetariano|ተክል|Biqiltuu/i.test(tag));
       if (!isVeg) return false;
     }
 
     if (filterSpicyOnly) {
-      const isSpicy = item.tags.some(tag => tag.toLowerCase().includes('spicy'));
+      const isSpicy = item.tags.some(tag => /spicy|picante|ቅመም|Qaraawaa/i.test(tag));
       if (!isSpicy) return false;
     }
 
     return true;
   });
 
-  const handlePlaceOrderClick = () => {
-    if (orderType === 'dine-in') {
-      if (!tableNumber) {
-        alert("Please enter your Table Number before placing your order!");
-        return;
+  // Generate the WhatsApp message using the active language.
+  const generateWhatsAppMessage = () => {
+    const header = t('waOrderGreeting');
+    const itemsList = cart.map(item => {
+      let customDetails = "";
+      if (item.selectedCustomizations && Object.keys(item.selectedCustomizations).length > 0) {
+        const parts = Object.entries(item.selectedCustomizations)
+          .map(([, v]) => Array.isArray(v) ? v.map(x => x.name).join(', ') : v)
+          .filter(Boolean);
+        if (parts.length > 0) {
+          customDetails = ` (${parts.join(', ')})`;
+        }
       }
-    } else {
-      if (!deliveryName || !deliveryPhone || !deliveryAddress) {
-        alert("Please fill out your Name, Phone Number, and Delivery Address to place a delivery order!");
-        return;
-      }
+      return `• ${item.quantity} ${item.name}${customDetails}`;
+    }).join('\n');
+
+    const totalText = `${t('waTotal')} ${subtotal} ETB`;
+    const locationInfo = orderType === 'dine-in'
+      ? `${t('waTable')} ${String(tableNumber).padStart(2, '0')}`
+      : `${t('waDeliveryDetails')}\n${t('waName')} ${deliveryName || t('customerName')}\n${t('waPhone')} ${deliveryPhone}\n${t('waAddress')} ${deliveryAddress}`;
+
+    return `${header}\n${itemsList}\n\n${totalText}\n${locationInfo}`;
+  };
+
+  const handleCopyMessage = () => {
+    const text = generateWhatsAppMessage();
+    navigator.clipboard.writeText(text);
+    setCopiedMessage(true);
+    setTimeout(() => setCopiedMessage(false), 2500);
+  };
+
+  const handleOpenWhatsApp = () => {
+    if (orderType === 'dine-in' && !tableNumber) {
+      alert(t('alertEnterTable'));
+      return;
     }
+    if (orderType === 'delivery' && (!deliveryName || !deliveryPhone || !deliveryAddress)) {
+      alert(t('alertEnterDelivery'));
+      return;
+    }
+
+    const message = generateWhatsAppMessage();
+    // Default cafe WhatsApp phone number (can be customized)
+    const phone = "251911234567";
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     
+    // Open in WhatsApp
+    window.open(waUrl, '_blank');
+
+    // Also record the order in our system
     onPlaceOrder({
       items: cart,
       subtotal,
@@ -168,26 +250,59 @@ export default function CustomerMenu({
       } : null,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'pending',
-      offerApplied: romanticOfferUnlocked ? romanticOffer.title : null
+      offerApplied: null
     });
 
-    // Reset Cart and inputs
+    setOrderSuccessModal(true);
     setCart([]);
     setIsCartOpen(false);
-    setDeliveryName('');
-    setDeliveryPhone('');
-    setDeliveryAddress('');
+  };
+
+  const handleDirectSystemOrder = () => {
+    if (orderType === 'dine-in' && !tableNumber) {
+      alert(t('alertEnterTable'));
+      return;
+    }
+    if (orderType === 'delivery' && (!deliveryName || !deliveryPhone || !deliveryAddress)) {
+      alert(t('alertEnterDelivery'));
+      return;
+    }
+
+    onPlaceOrder({
+      items: cart,
+      subtotal,
+      orderType,
+      tableNumber: orderType === 'dine-in' ? tableNumber : null,
+      deliveryDetails: orderType === 'delivery' ? {
+        name: deliveryName,
+        phone: deliveryPhone,
+        address: deliveryAddress
+      } : null,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'pending',
+      offerApplied: null
+    });
+
+    setOrderSuccessModal(true);
+    setCart([]);
+    setIsCartOpen(false);
   };
 
   const handleCallWaiterSubmit = (e) => {
     e.preventDefault();
     if (!tableNumber) {
-      alert("Please specify your table number first!");
+      alert(t('alertEnterTableFirst'));
       return;
     }
+    const waiterReasonLabel = {
+      general: t('waiterReasonGeneral'),
+      water: t('waiterReasonWater'),
+      bill: t('waiterReasonBill'),
+      napkins: t('waiterReasonNapkins')
+    }[waiterReason] || t('waiterReasonGeneral');
     onCallWaiter({
       tableNumber,
-      reason: waiterReason,
+      reason: waiterReasonLabel,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
     setWaiterAlertSent(true);
@@ -200,7 +315,7 @@ export default function CustomerMenu({
   const handleFeedbackSubmit = (e) => {
     e.preventDefault();
     onSubmitFeedback({
-      tableNumber: orderType === 'dine-in' ? `Table ${tableNumber}` : "Delivery Client",
+      tableNumber: orderType === 'dine-in' ? `${t('tableLabel')} ${tableNumber}` : t('delivery'),
       rating: feedbackRating,
       comment: feedbackComment,
       timestamp: new Date().toLocaleDateString()
@@ -222,154 +337,146 @@ export default function CustomerMenu({
     });
   };
 
-  const renderItemThumbnail = (imageType) => {
-    const imageUrl = dishImagesMap[imageType] || (imageType && imageType.startsWith('http') ? imageType : null);
+  const renderItemThumbnail = (imageKey, itemName) => {
+    const imageUrl = dishImagesMap[imageKey] || (imageKey && imageKey.startsWith('http') ? imageKey : null);
 
     if (imageUrl) {
       return (
-        <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-border-color shadow-sm">
+        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-stone-200/80 relative bg-stone-100 group">
           <img 
             src={imageUrl} 
-            alt="Dish Thumbnail" 
-            className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+            alt={itemName} 
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
           />
         </div>
       );
     }
 
-    const defaultColor = 'var(--primary)';
-    const defaultBg = 'rgba(var(--primary-rgb), 0.08)';
     return (
-      <div 
-        className="w-20 h-20 rounded-2xl flex items-center justify-center relative overflow-hidden transition-all shadow-sm shrink-0"
-        style={{ backgroundColor: defaultBg, color: defaultColor }}
-      >
-        <Icons.Utensils className="w-8 h-8" />
+      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">
+        <Icons.Coffee className="w-8 h-8" />
       </div>
     );
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto min-h-screen bg-bg-primary text-text-primary flex flex-col relative shadow-xl border-x border-border-color transition-all duration-300 pb-36">
+    <div className="w-full max-w-6xl mx-auto min-h-screen bg-[#faf8f5] text-stone-900 flex flex-col relative shadow-2xl border-x border-stone-200 font-body pb-32">
       
-      {/* Top Banner Cover Photo */}
-      <div className="relative h-56 w-full bg-gray-950 z-10">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-cover bg-center opacity-40 filter blur-[0.5px]" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200&auto=format&fit=crop')` }}></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-black/30 to-transparent"></div>
-        </div>
-        
-        {/* Contacts overlay bar */}
-        <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setActiveHeaderOverlay(activeHeaderOverlay === 'location' ? null : 'location')}
-              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all hover:bg-white/25 active:scale-95"
-            >
-              {renderIcon("MapPin", "w-5 h-5")}
-            </button>
-            <button 
-              onClick={() => setActiveHeaderOverlay(activeHeaderOverlay === 'phone' ? null : 'phone')}
-              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all hover:bg-white/25 active:scale-95"
-            >
-              {renderIcon("PhoneCall", "w-5 h-5")}
-            </button>
-            <button 
-              onClick={() => setActiveHeaderOverlay(activeHeaderOverlay === 'whatsapp' ? null : 'whatsapp')}
-              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all hover:bg-white/25 active:scale-95"
-            >
-              {renderIcon("MessageCircle", "w-5 h-5")}
-            </button>
-          </div>
-          
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setShowFeedbackModal(true)}
-              className="text-xs font-bold text-white bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full hover:bg-white/25 transition-all"
-            >
-              Review Us
-            </button>
-            <button 
-              onClick={onToggleAdmin}
-              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all hover:bg-white/25 active:scale-95"
-              title="Merchant View"
-            >
-              {renderIcon("Lock", "w-4 h-4")}
-            </button>
-          </div>
+      {/* 1. TOP APP BAR (matching the smartphone mockup in reference poster) */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 px-4 sm:px-6 py-3 flex items-center justify-between shadow-xs min-h-16">
+        {/* Hamburger Menu button */}
+        <button 
+          onClick={() => setIsDrawerOpen(true)}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+          aria-label={t('openMenu')}
+        >
+          <Icons.Menu className="w-5 h-5 stroke-[2.2]" />
+        </button>
+
+        {/* Center Title with official emblem */}
+        <div className="flex items-center gap-2">
+          <img 
+            src="/abu-coffee-logo.png" 
+            alt="Abu Coffee" 
+            className="w-7 h-7 rounded-full object-cover border border-amber-600/30"
+          />
+          <h1 className="font-extrabold text-base tracking-tight text-stone-900" style={{ fontFamily: 'var(--font-heading)' }}>
+            {restaurantName}
+          </h1>
         </div>
 
-        {/* Dynamic header widgets overlays */}
-        {activeHeaderOverlay && (
-          <div className="absolute top-16 left-4 right-4 bg-bg-secondary p-4 rounded-2xl shadow-2xl z-50 text-xs text-text-primary border border-border-color animate-fade-in">
-            {activeHeaderOverlay === 'location' && (
-              <div className="flex flex-col gap-1.5 text-left">
-                <span className="font-extrabold text-sm text-text-primary flex items-center gap-1.5">
-                  {renderIcon("MapPin", "w-4 h-4 text-red-500")} Restaurant Address
-                </span>
-                <p className="text-text-secondary mt-1">102 Elegant Promenade Avenue, Suite A</p>
-                <a href="#map" className="text-primary font-bold hover:underline mt-2 inline-block">View Route on Map &rarr;</a>
-              </div>
-            )}
-            {activeHeaderOverlay === 'phone' && (
-              <div className="flex flex-col gap-1.5 text-left">
-                <span className="font-extrabold text-sm text-text-primary flex items-center gap-1.5">
-                  {renderIcon("PhoneCall", "w-4 h-4 text-emerald-500")} Front Desk Call
-                </span>
-                <p className="text-text-secondary mt-1">Direct support hotline for reservations and queries.</p>
-                <a href="tel:+15550199" className="bg-primary text-white text-center py-2.5 rounded-xl font-bold mt-2 inline-block shadow">+1 (555) 0199</a>
-              </div>
-            )}
-            {activeHeaderOverlay === 'whatsapp' && (
-              <div className="flex flex-col gap-1.5 text-left">
-                <span className="font-extrabold text-sm text-text-primary flex items-center gap-1.5">
-                  {renderIcon("MessageCircle", "w-4 h-4 text-emerald-500")} WhatsApp Concierge
-                </span>
-                <p className="text-text-secondary mt-1">Text-only assistant for custom event catering bookings.</p>
-                <a href="https://wa.me/15550199" target="_blank" rel="noreferrer" className="bg-emerald-500 hover:bg-emerald-600 text-white text-center py-2.5 rounded-xl font-bold mt-2 inline-block shadow">
-                  Chat with Concierge
-                </a>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Shopping Cart Button with Green Count Badge */}
+        <div className="flex items-center gap-1.5">
+        <LanguageSelector variant="header" />
+        <button 
+          onClick={() => setIsCartOpen(true)}
+          className="relative w-10 h-10 rounded-full flex items-center justify-center text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+          aria-label={t('openCart')}
+        >
+          <Icons.ShoppingCart className="w-5 h-5 stroke-[2.2]" />
+          {totalItemsCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-emerald-600 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-scale">
+              {totalItemsCount}
+            </span>
+          )}
+        </button>
+        </div>
+      </header>
 
-        {/* Restaurant logo (inspired by Image 1 logo badge) */}
-        <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-20">
-          <div className="w-24 h-24 rounded-full border-4 border-accent bg-[#0f5132] flex items-center justify-center shadow-2xl transition-transform hover:scale-105 duration-300">
-            <div className="text-center p-2 text-white flex flex-col items-center justify-center">
-              <span className="text-[6px] tracking-wider uppercase opacity-90 leading-none">Bistro &amp; Lounge</span>
-              <span className="text-xs font-black tracking-widest uppercase leading-none mt-1">BISTRO</span>
-              <span className="text-[6px] tracking-wider uppercase opacity-90 leading-none mt-1">&amp; Company</span>
+      {/* 2. HERO BANNER WITH BRAND LOGO & TAGLINES */}
+      <div className="relative pt-6 pb-5 px-6 bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 text-white text-center overflow-hidden">
+        {/* Ambient Coffee Glow & Background */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-overlay filter blur-[1px]"
+          style={{ backgroundImage: `url('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?q=80&w=1200&auto=format&fit=crop')` }}
+        ></div>
+        <div className="absolute -top-12 -left-12 w-40 h-40 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col items-center">
+          {/* Official Abu Coffee Ethiopia Circular Emblem Logo */}
+          <div className="relative mb-3 group">
+            <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-amber-600 via-amber-300 to-emerald-500 shadow-2xl transition-transform duration-300 group-hover:scale-105">
+              <img 
+                src="/abu-coffee-logo.png" 
+                alt="Abu Coffee Ethiopia" 
+                className="w-full h-full rounded-full object-cover bg-stone-950 shadow-inner"
+              />
+            </div>
+            <div className="absolute -bottom-1 -right-1 bg-emerald-600 text-white p-1 rounded-full border-2 border-stone-900 shadow">
+              <Icons.Check className="w-3 h-3 stroke-[3]" />
             </div>
           </div>
+
+          {/* Slogan & Poster Subheading */}
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white mt-1">
+            {t('heroHeading')}
+          </h2>
+          <p className="text-xs text-stone-300 mt-1 max-w-sm font-medium">
+            {t('heroTagline')}
+          </p>
+
+          {/* Inspiration Badge: "Simple · Moderno · Rápido" */}
+          <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-emerald-700/80 border border-emerald-500/40 text-emerald-200 text-[11px] font-bold mt-2.5 shadow-sm">
+            <span>{t('badgeSimple')}</span>
+            <span>•</span>
+            <span>{t('badgeModern')}</span>
+            <span>•</span>
+            <span>{t('badgeFast')}</span>
+          </div>
+
+          {/* Quick Action Pills: WhatsApp Concierge, Call Waiter, Table info */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-3 border-t border-white/10 w-full">
+            {orderType === 'dine-in' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 text-white text-xs font-bold border border-white/15">
+                <Icons.MapPin className="w-3.5 h-3.5 text-amber-400" />
+                {t('tableLabel')} {String(tableNumber).padStart(2, '0')}
+              </span>
+            )}
+            <button 
+              onClick={() => setShowCallWaiterModal(true)}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/15 active:scale-95"
+            >
+              <Icons.BellRing className="w-3.5 h-3.5 text-amber-400" />
+              {t('callWaiter')}
+            </button>
+            <a 
+              href="https://wa.me/251911234567" 
+              target="_blank" 
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold transition-all border border-emerald-400/30 active:scale-95 shadow-sm"
+            >
+              <Icons.MessageCircle className="w-3.5 h-3.5" />
+              {t('directWhatsApp')}
+            </a>
+          </div>
         </div>
       </div>
 
-      {/* Intro branding text */}
-      <div className="text-center mt-20 px-6">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary opacity-80">Welcome To</p>
-        <h1 
-          className="text-2xl font-black tracking-tight mt-1 mb-1"
-          style={{ fontFamily: 'var(--font-heading)' }}
-        >
-          {restaurantName}
-        </h1>
-        <p className="text-xs italic text-text-secondary leading-relaxed">
-          {tagline}
-        </p>
-      </div>
-
-      <div className="px-6 mt-4">
-        <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-left">
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">Digital Menu</p>
-          <p className="text-sm font-semibold text-text-primary mt-1">Scan the table QR code to browse the menu from your phone.</p>
-        </div>
-      </div>
-
-      {/* Categories Horizontal Carousel */}
-      <div className="mt-6 px-6 overflow-x-auto whitespace-nowrap hide-scrollbar scroll-smooth">
-        <div className="flex gap-2.5 pb-1">
+      {/* 3. CATEGORIES HORIZONTAL CAROUSEL (matching inspiration mockup pills) */}
+      <nav aria-label={t('menuCategories')} className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 py-3 px-4 shadow-xs">
+        <div className="flex gap-2 overflow-x-auto whitespace-nowrap hide-scrollbar scroll-smooth">
           {categories.map(cat => {
             const isSelected = selectedCategory === cat.id;
             return (
@@ -377,82 +484,79 @@ export default function CustomerMenu({
                 key={cat.id}
                 ref={el => categoryRefs.current[cat.id] = el}
                 onClick={() => handleCategorySelect(cat.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-300 shadow-sm border ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 shrink-0 ${
                   isSelected 
-                    ? 'border-transparent text-white' 
-                    : 'bg-bg-secondary text-text-secondary border-border-color hover:bg-bg-tertiary'
+                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 scale-[1.02]' 
+                    : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50 hover:text-stone-900'
                 }`}
-                style={{
-                  backgroundColor: isSelected ? 'var(--primary)' : '',
-                  color: isSelected ? 'var(--text-light)' : ''
-                }}
               >
-                {renderIcon(cat.icon, `w-4 h-4 ${isSelected ? 'stroke-[2.5]' : ''}`)}
+                {renderIcon(cat.icon, `w-3.5 h-3.5 ${isSelected ? 'stroke-[2.5]' : ''}`)}
                 <span>{cat.name}</span>
               </button>
             );
           })}
         </div>
-      </div>
+      </nav>
 
-      {/* Search and Filters bar */}
-      <div className="px-6 mt-4 flex gap-3">
+      {/* 4. SEARCH & QUICK FILTERS */}
+      <div className="w-full max-w-4xl mx-auto px-4 pt-3 flex gap-2">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search recipes, ingredients..."
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-bg-secondary rounded-xl py-3 pl-10 pr-10 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary border border-border-color"
+            className="w-full bg-white rounded-xl py-2.5 pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600 border border-stone-200 shadow-xs"
           />
-          <div className="absolute left-3.5 top-3.5 text-text-secondary">
-            {renderIcon("Search", "w-4 h-4")}
+          <div className="absolute left-3 top-2.5 text-stone-400">
+            <Icons.Search className="w-4 h-4" />
           </div>
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
-              className="absolute right-3.5 top-3.5 text-text-secondary hover:text-text-primary"
+              className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600"
             >
-              {renderIcon("X", "w-4 h-4")}
+              <Icons.X className="w-4 h-4" />
             </button>
           )}
         </div>
 
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-4 py-3 rounded-xl flex items-center justify-center border transition-all ${
+          className={`h-9 px-3 rounded-xl flex items-center justify-center border transition-all text-xs font-bold gap-1.5 shadow-xs ${
             showFilters || filterVegOnly || filterSpicyOnly
-              ? 'text-primary border-primary bg-primary/10'
-              : 'bg-bg-secondary border-border-color text-text-secondary'
+              ? 'text-emerald-700 border-emerald-600 bg-emerald-50'
+              : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
           }`}
         >
-          {renderIcon("SlidersHorizontal", "w-4.5 h-4.5")}
+          <Icons.SlidersHorizontal className="w-3.5 h-3.5" />
+          <span>{t('filters')}</span>
         </button>
       </div>
 
-      {/* Expanded filters options */}
+      {/* Expanded filters */}
       {showFilters && (
-        <div className="mx-6 mt-2.5 p-3.5 bg-bg-secondary rounded-2xl border border-border-color shadow-sm flex items-center justify-between gap-3 animate-fade-in">
+        <div className="mx-4 mt-2 p-2.5 bg-white rounded-xl border border-stone-200 shadow-xs flex items-center justify-between gap-2">
           <div className="flex gap-2">
             <button 
               onClick={() => setFilterVegOnly(!filterVegOnly)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
                 filterVegOnly 
-                  ? 'bg-green-600 border-green-600 text-white' 
-                  : 'bg-transparent border-border-color text-text-secondary'
+                  ? 'bg-emerald-600 border-emerald-600 text-white' 
+                  : 'bg-stone-50 border-stone-200 text-stone-600'
               }`}
             >
-              {renderIcon("Leaf", "w-3.5 h-3.5")} Vegetarian
+              <Icons.Leaf className="w-3 h-3" /> {t('filterVegetarian')}
             </button>
             <button 
               onClick={() => setFilterSpicyOnly(!filterSpicyOnly)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
                 filterSpicyOnly 
-                  ? 'bg-red-600 border-red-600 text-white' 
-                  : 'bg-transparent border-border-color text-text-secondary'
+                  ? 'bg-rose-600 border-rose-600 text-white' 
+                  : 'bg-stone-50 border-stone-200 text-stone-600'
               }`}
             >
-              {renderIcon("Flame", "w-3.5 h-3.5")} Spicy
+              <Icons.Flame className="w-3 h-3" /> {t('filterSpicy')}
             </button>
           </div>
           <button 
@@ -461,128 +565,533 @@ export default function CustomerMenu({
               setFilterSpicyOnly(false);
               setShowFilters(false);
             }}
-            className="text-xs font-bold text-text-secondary hover:text-text-primary"
+            className="text-[11px] font-bold text-stone-400 hover:text-stone-700"
           >
-            Clear Filters
+            {t('filterClear')}
           </button>
         </div>
       )}
 
-      {/* Dishes display grid */}
-      <div className="px-6 mt-4 flex-1">
+      {/* 5. DISHES / ITEMS LIST (CENTERPIECE FROM THE INSPIRATION POSTER) */}
+      <main className="w-full max-w-5xl mx-auto px-4 mt-4 flex-1">
         {filteredMenu.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredMenu.map(item => (
-              <div
-                key={item.id}
-                onClick={() => setSelectedItem(item)}
-                className="flex items-center justify-between p-4 bg-bg-secondary rounded-2xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer shadow-sm border border-border-color text-left gap-4"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-extrabold text-sm tracking-tight text-text-primary" style={{ fontFamily: 'var(--font-heading)' }}>
-                      {item.name}
-                    </h3>
-                    {item.tags.includes("Chef Recommendation") && (
-                      <span className="text-[8px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Special</span>
-                    )}
-                  </div>
-                  <p className="text-xs mt-1 text-text-secondary line-clamp-2 leading-relaxed">
-                    {item.description}
-                  </p>
-                  <span className="inline-block mt-3 font-black text-sm text-primary">
-                    ${item.price.toFixed(2)}
-                  </span>
-                </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {filteredMenu.map(item => {
+              const qtyInCart = getItemQuantityInCart(item.id);
 
-                {renderItemThumbnail(item.image)}
-              </div>
-            ))}
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedItem(item)}
+                  className={`flex items-center gap-3 p-3 sm:p-4 bg-white rounded-2xl border transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:border-emerald-300 ${
+                    qtyInCart > 0 ? 'border-emerald-500/40 bg-emerald-50/20' : 'border-stone-200'
+                  }`}
+                >
+                  {/* Left: Square Thumbnail (inspired by Bruschetta / Caesar / Pasta on reference image) */}
+                  {renderItemThumbnail(item.image, item.name)}
+
+                  {/* Middle: Dish Name, Description, Price */}
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="font-extrabold text-sm sm:text-base tracking-tight text-stone-900 leading-snug" style={{ fontFamily: 'var(--font-heading)' }}>
+                        {item.name}
+                      </h3>
+                      {item.tags && item.tags.length > 0 && item.tags.includes("Favorito") && (
+                        <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.2 rounded-full font-bold uppercase tracking-wider">
+                          {t('favoriteBadge')}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
+                      {item.description}
+                    </p>
+
+                    {/* Bottom Row: Price + Direct Quantity Selector Pill [ - 1 + ] */}
+                    <div className="flex items-center justify-between mt-2.5 pt-1">
+                      <span className="font-extrabold text-sm sm:text-base text-stone-900">
+                        {item.price} ETB
+                      </span>
+
+                      {/* Quantity Selector Pill as shown in the inspiration mockup */}
+                      {qtyInCart > 0 ? (
+                        <div 
+                          className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 rounded-full px-1.5 py-0.5 shadow-xs"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={(e) => handleInlineSubtract(item, e)}
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-emerald-800 hover:bg-emerald-200 active:scale-90 transition-all font-black text-sm"
+                            title={t('decreaseQty')}
+                          >
+                            −
+                          </button>
+                          <span className="w-4 text-center font-black text-xs text-emerald-900">
+                            {qtyInCart}
+                          </span>
+                          <button
+                            onClick={(e) => handleInlineAdd(item, e)}
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-emerald-800 hover:bg-emerald-200 active:scale-90 transition-all font-black text-sm"
+                            title={t('increaseQty')}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => handleInlineAdd(item, e)}
+                          className="px-3 py-1 rounded-full bg-stone-100 hover:bg-emerald-600 hover:text-white text-stone-700 font-bold text-xs border border-stone-200 transition-all active:scale-95 flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>+</span>
+                          <span>{t('addToCart')}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="text-center py-12">
-            {renderIcon("Compass", "w-10 h-10 text-text-secondary mx-auto stroke-[1.5]")}
-            <p className="text-sm text-text-secondary mt-2 font-bold">No recipes found under this category.</p>
+          <div className="text-center py-16 text-stone-400">
+            <Icons.Coffee className="w-10 h-10 mx-auto stroke-[1.2] text-stone-300" />
+            <p className="text-xs font-semibold mt-2">{t('noItemsFound')}</p>
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Bottom Sticky Promotion Bar & Cart Checkout Access */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 border-t bg-bg-secondary/95 backdrop-blur-md z-40 border-border-color shadow-2xl max-w-2xl mx-auto flex flex-col gap-3">
-        {/* Promotion progress bar removed as requested */}
-
-        {/* Action button row: Waiter Calling & Checkout Cart */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowCallWaiterModal(true)}
-            className="w-14 h-14 rounded-2xl flex items-center justify-center border hover:bg-bg-tertiary active:scale-95 transition-all text-red-500 bg-bg-secondary border-border-color"
-            title="Call Waiter"
-          >
-            {renderIcon("BellRing", "w-6 h-6")}
-          </button>
-
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className={`flex-1 h-14 rounded-2xl text-white font-extrabold text-sm uppercase tracking-wider flex items-center justify-between px-6 shadow-xl hover:brightness-110 active:scale-95 transition-all ${
-              animateCart ? 'cart-bounce' : ''
-            }`}
-            style={{ backgroundColor: 'var(--primary)' }}
-          >
-            <div className="flex items-center gap-2">
-              {renderIcon("ShoppingCart", "w-5 h-5")}
-              <span>View Order</span>
-              {cart.length > 0 && (
-                <span className="bg-white text-primary text-xs w-6 h-6 flex items-center justify-center rounded-full font-black" style={{ color: 'var(--primary)' }}>
-                  {cart.reduce((a, b) => a + b.quantity, 0)}
+      {/* 6. STICKY BOTTOM BAR (EXACT INSPIRATION DESIGN: "ENVIAR PEDIDO POR WHATSAPP") */}
+      {totalItemsCount > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-2xl z-40 max-w-5xl mx-auto animate-slide-up">
+          <div className="flex items-center justify-between gap-3">
+            {/* Left Summary: Item Count & Total */}
+            <div 
+              onClick={() => setIsCartOpen(true)}
+              className="flex items-center gap-2.5 cursor-pointer select-none py-1 pl-1"
+            >
+              <div className="relative w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                <Icons.ShoppingCart className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 bg-emerald-700 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow">
+                  {totalItemsCount}
                 </span>
-              )}
+              </div>
+              <div className="text-left leading-tight">
+                <span className="text-[11px] font-semibold text-stone-500 block">
+                  {totalItemsCount} {totalItemsCount === 1 ? t('itemSingle') : t('itemPlural')}
+                </span>
+                <span className="text-base font-black text-stone-900">
+                  {subtotal} ETB
+                </span>
+              </div>
             </div>
-            <span>${subtotal.toFixed(2)}</span>
-          </button>
-        </div>
-      </div>
 
-      {/* Call Waiter Modal Overlays */}
+            {/* Right Action Button: Big Green "ENVIAR PEDIDO POR WHATSAPP" CTA */}
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className={`flex-1 max-w-xs h-12 bg-emerald-700 hover:bg-emerald-600 text-white rounded-2xl font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-700/25 active:scale-[0.98] transition-all whatsapp-glow ${
+                animateCart ? 'cart-bounce' : ''
+              }`}
+            >
+              {/* WhatsApp Icon */}
+              <Icons.MessageCircle className="w-4.5 h-4.5 fill-white text-emerald-700" />
+              <span>{t('sendOrderWhatsApp')}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 7. WHATSAPP CHECKOUT & CHAT PREVIEW DRAWER */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex flex-col justify-end animate-fade-in">
+          <div className="w-full bg-white rounded-t-[32px] max-h-[92dvh] flex flex-col shadow-2xl max-w-2xl mx-auto border-t border-stone-200">
+            {/* Header */}
+            <div className="px-6 pt-5 pb-3 border-b flex items-center justify-between border-stone-200">
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/abu-coffee-logo.png" 
+                  alt="Abu Coffee" 
+                  className="w-6 h-6 rounded-full"
+                />
+                <h2 className="text-base font-extrabold tracking-tight text-stone-900">
+                  {t('yourOrder')}
+                </h2>
+              </div>
+              <button 
+                onClick={() => setIsCartOpen(false)}
+                className="p-1.5 rounded-full hover:bg-stone-100 text-stone-500"
+              >
+                <Icons.X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cart Contents */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              
+              {/* Order Mode Toggle: Dine-In vs Delivery */}
+              <div className="flex border border-stone-200 rounded-xl p-1 bg-stone-100 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setOrderType('dine-in')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    orderType === 'dine-in'
+                      ? 'bg-emerald-700 text-white shadow'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <Icons.Utensils className="w-3.5 h-3.5" />
+                  <span>{t('dineIn')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('delivery')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    orderType === 'delivery'
+                      ? 'bg-emerald-700 text-white shadow'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <Icons.Bike className="w-3.5 h-3.5" />
+                  <span>{t('delivery')}</span>
+                </button>
+              </div>
+
+              {/* Table or Address Fields */}
+              {orderType === 'dine-in' ? (
+                <div className="p-3.5 rounded-2xl border border-stone-200 bg-stone-50 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <Icons.QrCode className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <span className="text-[10px] uppercase font-bold text-stone-500 block">{t('tableNumberLabel')}</span>
+                    <input
+                      type="number"
+                      required
+                      placeholder={t('tableNumberPlaceholder')}
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
+                      className="w-full mt-0.5 bg-transparent font-black text-sm border-b border-stone-300 focus:border-emerald-600 focus:outline-none text-stone-900"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl border border-stone-200 bg-stone-50 space-y-2 text-left">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 block mb-1">{t('customerName')}</label>
+                      <input
+                        type="text"
+                        placeholder={t('customerName')}
+                        value={deliveryName}
+                        onChange={(e) => setDeliveryName(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 block mb-1">{t('customerPhone')}</label>
+                      <input
+                        type="tel"
+                        placeholder="+251 ..."
+                        value={deliveryPhone}
+                        onChange={(e) => setDeliveryPhone(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-stone-500 block mb-1">{t('deliveryAddress')}</label>
+                    <input
+                      type="text"
+                      placeholder={t('deliveryAddressPlaceholder')}
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Items List */}
+              <div className="divide-y divide-stone-200">
+                {cart.map((item, idx) => (
+                  <div key={`${item.id}-${idx}`} className="py-3 flex items-center justify-between gap-3">
+                    <div className="flex-1 text-left">
+                      <h4 className="font-bold text-xs text-stone-900">{item.name}</h4>
+                      {item.selectedCustomizations && (
+                        <div className="text-[10px] text-stone-500 mt-0.5 space-y-0.5">
+                          {Object.entries(item.selectedCustomizations).map(([cName, val]) => {
+                            if (Array.isArray(val)) {
+                              if (val.length === 0) return null;
+                              return <p key={cName}>{cName}: {val.map(v => v.name).join(', ')}</p>;
+                            }
+                            return <p key={cName}>{cName}: {val}</p>;
+                          })}
+                        </div>
+                      )}
+                      <span className="text-xs font-extrabold text-emerald-800 mt-1 inline-block">
+                        {item.finalUnitPrice} ETB
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 border border-stone-200 rounded-xl p-1 bg-stone-50">
+                      <button 
+                        onClick={() => updateCartQty(idx, -1)}
+                        className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-white rounded"
+                      >
+                        <Icons.Minus className="w-3 h-3" />
+                      </button>
+                      <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
+                      <button 
+                        onClick={() => updateCartQty(idx, 1)}
+                        className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-white rounded"
+                      >
+                        <Icons.Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* WHATSAPP MESSAGE BUBBLE PREVIEW (recreating the graphic shown in the inspiration poster!) */}
+              <div className="mt-4 pt-3 border-t border-stone-200 text-left">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                    <Icons.MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    {t('whatsAppPreviewTitle')}
+                  </span>
+                  <button 
+                    onClick={handleCopyMessage}
+                    className="text-[10px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                  >
+                    <Icons.Copy className="w-3 h-3" />
+                    {copiedMessage ? t('copiedSuccess') : t('copyMessage')}
+                  </button>
+                </div>
+
+                <div className="whatsapp-chat-bubble p-4 text-xs text-stone-800 space-y-1.5 font-sans leading-relaxed">
+                  <p className="font-semibold text-stone-900">{t('waOrderGreeting')}</p>
+                  <div className="pl-1 space-y-0.5">
+                    {cart.map((item, i) => (
+                      <p key={i} className="font-medium">
+                        • {item.quantity} {item.name}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="pt-2 mt-2 border-t border-emerald-300/40 flex items-center justify-between font-bold">
+                    <span>{t('waTotal')} {subtotal} ETB</span>
+                    <span className="text-[10px] text-stone-500 font-normal flex items-center gap-1">
+                      11:30 <Icons.CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pedido recibido confirmation bubble simulation (from inspiration mockup) */}
+                <div className="mt-3 bg-white p-3 rounded-2xl border border-emerald-200 shadow-2xs flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <Icons.Check className="w-4 h-4 stroke-[3]" />
+                  </div>
+                  <div>
+                    <h5 className="font-extrabold text-xs text-stone-900">{t('orderReceivedSimulation')}</h5>
+                    <p className="text-[11px] text-stone-500">{t('orderReceivedSimDesc')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="p-4 sm:p-6 border-t border-stone-200 bg-stone-50 flex flex-col gap-2.5">
+              <div className="flex justify-between items-center text-sm font-black">
+                <span>{t('totalToPay')}</span>
+                <span className="text-xl font-black text-emerald-800">
+                  {subtotal} ETB
+                </span>
+              </div>
+
+              {/* Main Button 1: Send via WhatsApp */}
+              <button
+                onClick={handleOpenWhatsApp}
+                className="w-full py-3.5 rounded-2xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all"
+              >
+                <Icons.MessageCircle className="w-4.5 h-4.5 fill-white" />
+                <span>{t('sendOrderWhatsApp')}</span>
+              </button>
+
+              {/* Direct Kitchen Confirm Button */}
+              <button
+                onClick={handleDirectSystemOrder}
+                className="w-full py-2.5 rounded-xl border border-stone-300 text-stone-700 hover:bg-stone-200 font-bold text-xs transition-all"
+              >
+                {t('confirmDirectKitchen')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. ORDER SUCCESS MODAL */}
+      {orderSuccessModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[160] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-emerald-100">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3">
+              <Icons.CheckCircle2 className="w-9 h-9" />
+            </div>
+            <h3 className="text-lg font-black text-stone-900" style={{ fontFamily: 'var(--font-heading)' }}>
+              {t('orderSuccessTitle')}
+            </h3>
+            <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+              {t('orderSuccessDesc')}
+            </p>
+
+            <div className="mt-4 p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs font-semibold text-stone-700 flex items-center justify-between">
+              <span>{t('orderStatusLabel')}</span>
+              <span className="text-emerald-700 font-bold">{t('orderStatusPreparing')}</span>
+            </div>
+
+            <button
+              onClick={() => setOrderSuccessModal(false)}
+              className="mt-5 w-full py-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+            >
+              {t('backToMenu')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 9. SIDE DRAWER NAVIGATION (CLICK HAMBURGER) */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[150] flex animate-fade-in">
+          <div className="w-72 bg-white h-full shadow-2xl flex flex-col p-6 text-left animate-slide-right">
+            <div className="flex items-center justify-between pb-4 border-b border-stone-200">
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/abu-coffee-logo.png" 
+                  alt="Abu Coffee Logo" 
+                  className="w-10 h-10 rounded-full"
+                />
+                <div>
+                  <h3 className="font-black text-sm leading-none">Abu Coffee</h3>
+                  <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Ethiopia</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsDrawerOpen(false)}
+                className="p-1 text-stone-400 hover:text-stone-700"
+              >
+                <Icons.X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Drawer Links & Info */}
+            <div className="flex-1 py-4 space-y-4 overflow-y-auto">
+              <LanguageSelector variant="drawer" />
+
+              <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200">
+                <span className="text-[10px] uppercase font-bold text-stone-400 block mb-1">{t('guestWifi')}</span>
+                <div className="text-xs font-bold text-stone-800">
+                  <p>{t('networkLabel')} <span className="font-mono text-emerald-800">AbuCoffee_Guest</span></p>
+                  <p>{t('passwordLabel')} <span className="font-mono text-emerald-800">buna2026</span></p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <button 
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    setShowCallWaiterModal(true);
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-800"
+                >
+                  <Icons.BellRing className="w-4 h-4 text-amber-600" />
+                  <span>{t('callWaiter')}</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    setShowFeedbackModal(true);
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-800"
+                >
+                  <Icons.Star className="w-4 h-4 text-amber-500" />
+                  <span>{t('leaveReview')}</span>
+                </button>
+
+                <a 
+                  href="https://wa.me/251911234567" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-stone-100 text-xs font-bold text-stone-800"
+                >
+                  <Icons.MessageCircle className="w-4 h-4 text-emerald-600" />
+                  <span>{t('whatsappContact')}</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Switch to Merchant Console */}
+            <div className="pt-4 border-t border-stone-200">
+              <button
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  onToggleAdmin();
+                }}
+                className="w-full py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-700 text-xs font-bold flex items-center justify-center gap-2"
+              >
+                <Icons.Lock className="w-3.5 h-3.5" />
+                <span>{t('adminConsole')}</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1" onClick={() => setIsDrawerOpen(false)}></div>
+        </div>
+      )}
+
+      {/* 10. CALL WAITER MODAL */}
       {showCallWaiterModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-bg-secondary border border-border-color rounded-3xl p-6 w-full max-w-sm shadow-2xl text-center text-text-primary">
-            <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-950/20 text-red-500 flex items-center justify-center mx-auto mb-4">
-              {renderIcon("BellRing", "w-7 h-7")}
+          <div className="bg-white border border-stone-200 rounded-3xl p-6 w-full max-w-sm shadow-2xl text-center text-stone-900">
+            <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+              <Icons.BellRing className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-black tracking-tight">Need Table Assistance?</h3>
-            <p className="text-xs text-text-secondary mt-1.5">Select your assistance request below.</p>
+            <h3 className="text-base font-black tracking-tight">{t('waiterModalTitle')}</h3>
+            <p className="text-xs text-stone-500 mt-1">{t('waiterModalSubtitle')}</p>
 
             {waiterAlertSent ? (
-              <div className="mt-5 p-4 bg-emerald-500/10 text-emerald-500 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-emerald-500/20">
-                {renderIcon("CheckCircle2", "w-4.5 h-4.5 text-emerald-500")} Alert Sent to Staff!
+              <div className="mt-4 p-4 bg-emerald-50 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-emerald-200">
+                <Icons.CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                {t('waiterSentAlert')}
               </div>
             ) : (
-              <form onSubmit={handleCallWaiterSubmit} className="mt-5">
-                <div className="mb-4 text-left">
-                  <label className="text-[10px] uppercase font-bold text-text-secondary">Enter Table Number</label>
+              <form onSubmit={handleCallWaiterSubmit} className="mt-4">
+                <div className="mb-3 text-left">
+                  <label className="text-[10px] uppercase font-bold text-stone-500">{t('tableNumberLabel')}</label>
                   <input
                     type="number"
                     required
-                    placeholder="e.g. 4"
+                    placeholder={t('tableNumberPlaceholder')}
                     value={tableNumber}
                     onChange={(e) => setTableNumber(e.target.value)}
-                    className="w-full mt-1 border border-border-color bg-bg-tertiary rounded-xl p-3 text-xs font-black focus:outline-none"
+                    className="w-full mt-1 border border-stone-200 bg-stone-50 rounded-xl p-2.5 text-xs font-black focus:outline-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mb-5">
-                  {['Assistance', 'Request Water', 'Bring Bill', 'More Menus'].map(reason => (
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {[
+                    ['general', 'waiterReasonGeneral'],
+                    ['water', 'waiterReasonWater'],
+                    ['bill', 'waiterReasonBill'],
+                    ['napkins', 'waiterReasonNapkins']
+                  ].map(([reason, labelKey]) => (
                     <button
                       key={reason}
                       type="button"
                       onClick={() => setWaiterReason(reason)}
                       className={`p-2.5 rounded-xl text-xs font-bold border text-center transition-all ${
                         waiterReason === reason 
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                          : 'border-border-color text-text-secondary bg-bg-secondary'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-xs'
+                          : 'border-stone-200 text-stone-600 bg-white'
                       }`}
                     >
-                      {reason}
+                      {t(labelKey)}
                     </button>
                   ))}
                 </div>
@@ -591,16 +1100,15 @@ export default function CustomerMenu({
                   <button
                     type="button"
                     onClick={() => setShowCallWaiterModal(false)}
-                    className="flex-1 py-3 text-xs font-bold rounded-xl border border-border-color text-text-secondary hover:bg-bg-tertiary"
+                    className="flex-1 py-2.5 text-xs font-bold rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-50"
                   >
-                    Cancel
+                    {t('cancelButton')}
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 text-xs font-bold rounded-xl text-white hover:brightness-110"
-                    style={{ backgroundColor: 'var(--primary)' }}
+                    className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white"
                   >
-                    Send Alert
+                    {t('callButton')}
                   </button>
                 </div>
               </form>
@@ -609,228 +1117,23 @@ export default function CustomerMenu({
         </div>
       )}
 
-      {/* Cart Drawer / Slide Panel Overlay */}
-      {isCartOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex flex-col justify-end animate-fade-in">
-          <div className="w-full bg-bg-secondary rounded-t-[32px] max-h-[90%] flex flex-col shadow-2xl max-w-2xl mx-auto border-t border-border-color">
-            {/* Header */}
-            <div className="px-6 pt-5 pb-3 border-b flex items-center justify-between border-border-color">
-              <div className="flex items-center gap-2">
-                {renderIcon("ShoppingCart", "w-5 h-5 text-primary")}
-                <h2 className="text-base font-extrabold tracking-tight">Checkout Order</h2>
-              </div>
-              <button 
-                onClick={() => setIsCartOpen(false)}
-                className="p-1.5 rounded-full hover:bg-bg-tertiary"
-              >
-                {renderIcon("X", "w-5 h-5")}
-              </button>
-            </div>
-
-            {/* Cart Items List */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
-              
-              {/* Order Mode Toggle: Dine-In vs Delivery */}
-              <div className="flex border border-border-color rounded-xl p-1 bg-bg-tertiary gap-1 mb-5">
-                <button
-                  type="button"
-                  onClick={() => setOrderType('dine-in')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    orderType === 'dine-in'
-                      ? 'bg-primary text-white shadow'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {renderIcon("UtensilsCrossed", "w-3.5 h-3.5")}
-                  <span>Dine In (Table Scan)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOrderType('delivery')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    orderType === 'delivery'
-                      ? 'bg-primary text-white shadow'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {renderIcon("Bike", "w-3.5 h-3.5")}
-                  <span>Order Delivery</span>
-                </button>
-              </div>
-
-              {/* Checkout Parameter Fields based on Order Type */}
-              {orderType === 'dine-in' ? (
-                <div className="mb-5 p-4 rounded-2xl border flex items-center gap-3 bg-bg-tertiary border-border-color">
-                  {renderIcon("Tablet", "w-5 h-5 text-amber-500")}
-                  <div className="flex-1 text-left">
-                    <span className="text-[10px] uppercase font-extrabold text-text-secondary block leading-none">Scanning Table Number</span>
-                    <input
-                      type="number"
-                      required
-                      placeholder="e.g. 4"
-                      value={tableNumber}
-                      onChange={(e) => setTableNumber(e.target.value)}
-                      className="w-full mt-1.5 bg-transparent font-black text-sm border-b focus:outline-none border-border-color focus:border-primary text-text-primary"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-5 p-4 rounded-2xl border flex flex-col gap-3 bg-bg-tertiary border-border-color text-left animate-fade-in">
-                  <h4 className="text-[10px] font-black uppercase text-text-secondary flex items-center gap-1">
-                    {renderIcon("Map", "w-3.5 h-3.5")} Delivery Credentials
-                  </h4>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[9px] font-bold text-text-secondary block mb-1">Full Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="John Doe"
-                        value={deliveryName}
-                        onChange={(e) => setDeliveryName(e.target.value)}
-                        className="w-full bg-bg-secondary border border-border-color rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-text-secondary block mb-1">Contact Phone</label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="+1 (555) 0184"
-                        value={deliveryPhone}
-                        onChange={(e) => setDeliveryPhone(e.target.value)}
-                        className="w-full bg-bg-secondary border border-border-color rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] font-bold text-text-secondary block mb-1">Full Delivery Address</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Street name, Apartment, Block/Room"
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      className="w-full bg-bg-secondary border border-border-color rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {cart.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  {cart.map((item, idx) => (
-                    <div 
-                      key={`${item.id}-${idx}`}
-                      className="flex items-center justify-between pb-3.5 border-b border-border-color"
-                    >
-                      <div className="flex-1 text-left pr-2">
-                        <h4 className="font-extrabold text-xs text-text-primary">{item.name}</h4>
-                        {item.selectedCustomizations && (
-                          <div className="text-[9px] text-text-secondary mt-0.5 space-y-0.5 leading-none">
-                            {Object.entries(item.selectedCustomizations).map(([cName, val]) => {
-                              if (Array.isArray(val)) {
-                                if (val.length === 0) return null;
-                                return <p key={cName}>{cName}: {val.map(v => v.name).join(', ')}</p>;
-                              }
-                              return <p key={cName}>{cName}: {val}</p>;
-                            })}
-                          </div>
-                        )}
-                        <span className="text-[10px] font-bold text-primary mt-1 inline-block">
-                          ${item.finalUnitPrice.toFixed(2)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 border rounded-lg p-0.5 bg-bg-tertiary border-border-color">
-                        <button 
-                          onClick={() => updateCartQty(idx, -1)}
-                          className="w-7 h-7 flex items-center justify-center text-text-secondary hover:bg-bg-secondary rounded"
-                        >
-                          {renderIcon("Minus", "w-3.5 h-3.5")}
-                        </button>
-                        <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                        <button 
-                          onClick={() => updateCartQty(idx, 1)}
-                          className="w-7 h-7 flex items-center justify-center text-text-secondary hover:bg-bg-secondary rounded"
-                        >
-                          {renderIcon("Plus", "w-3.5 h-3.5")}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {romanticOfferUnlocked && (
-                    <div className="flex items-center justify-between p-3 bg-emerald-500/10 text-emerald-500 rounded-xl text-xs font-bold border border-emerald-500/20">
-                      <span className="flex items-center gap-1.5">
-                        {renderIcon("Sparkles", "w-4 h-4")} Special Promo Unlocked: 1 Dessert + 1 Mocktail Included
-                      </span>
-                      <span>FREE</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-14 text-text-secondary text-xs">
-                  {renderIcon("ShoppingBag", "w-10 h-10 text-text-secondary/40 mx-auto mb-2.5 stroke-[1.5]")}
-                  Your cart is empty.
-                </div>
-              )}
-            </div>
-
-            {/* Total summary calculations */}
-            <div className="p-6 border-t bg-bg-secondary border-border-color">
-              <div className="flex justify-between items-center text-xs font-bold text-text-secondary mb-3">
-                <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-              
-              {orderType === 'delivery' && (
-                <div className="flex justify-between items-center text-xs font-bold text-text-secondary mb-3 border-b border-border-color/30 pb-2">
-                  <span>Estimated Delivery Fee</span>
-                  <span className="text-emerald-500">FREE</span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center text-sm font-black mb-5">
-                <span>Total Bill</span>
-                <span className="text-lg text-primary">
-                  ${subtotal.toFixed(2)}
-                </span>
-              </div>
-
-              <button
-                disabled={cart.length === 0}
-                onClick={handlePlaceOrderClick}
-                className="w-full py-4 rounded-2xl text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl disabled:opacity-40 disabled:pointer-events-none hover:brightness-110 active:scale-[0.98] transition-all"
-                style={{ backgroundColor: 'var(--primary)' }}
-              >
-                {renderIcon("ChefHat", "w-4.5 h-4.5")} 
-                <span>{orderType === 'dine-in' ? 'Send Order to Kitchen' : 'Confirm Delivery Order'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Review / Feedback Modal */}
+      {/* 11. FEEDBACK / REVIEW MODAL */}
       {showFeedbackModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-bg-secondary border border-border-color rounded-3xl p-6 w-full max-w-sm shadow-2xl text-center text-text-primary animate-slide-up">
-            <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-950/20 text-amber-500 flex items-center justify-center mx-auto mb-3">
-              {renderIcon("HeartHandshake", "w-7 h-7")}
+          <div className="bg-white border border-stone-200 rounded-3xl p-6 w-full max-w-sm shadow-2xl text-center text-stone-900">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-2.5">
+              <Icons.Star className="w-6 h-6 fill-amber-500 text-amber-500" />
             </div>
-            <h3 className="text-base font-extrabold tracking-tight">Review Your Meal</h3>
-            <p className="text-xs text-text-secondary mt-1">We appreciate your feedback to make meals more delightful.</p>
+            <h3 className="text-base font-black">{t('reviewModalTitle')}</h3>
+            <p className="text-xs text-stone-500 mt-0.5">{t('reviewModalSubtitle')}</p>
 
             {feedbackSuccess ? (
-              <div className="mt-5 p-4 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5">
-                {renderIcon("CheckCircle2", "w-4.5 h-4.5 text-emerald-500")} Review Submitted Successfully!
+              <div className="mt-4 p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5">
+                <Icons.CheckCircle2 className="w-4 h-4 text-emerald-600" /> {t('reviewSuccessMessage')}
               </div>
             ) : (
-              <form onSubmit={handleFeedbackSubmit} className="mt-5 flex flex-col gap-4">
-                <div className="flex items-center justify-center gap-1.5">
+              <form onSubmit={handleFeedbackSubmit} className="mt-4 flex flex-col gap-3">
+                <div className="flex items-center justify-center gap-1">
                   {[1, 2, 3, 4, 5].map(star => (
                     <button
                       key={star}
@@ -838,23 +1141,23 @@ export default function CustomerMenu({
                       onClick={() => setFeedbackRating(star)}
                       className="p-1 hover:scale-110 transition-transform"
                     >
-                      {renderIcon("Star", `w-8 h-8 ${
+                      <Icons.Star className={`w-7 h-7 ${
                         feedbackRating >= star 
                           ? 'fill-amber-400 stroke-amber-400 text-amber-400' 
-                          : 'stroke-text-secondary text-transparent'
-                      }`)}
+                          : 'stroke-stone-300 text-transparent'
+                      }`} />
                     </button>
                   ))}
                 </div>
 
                 <div className="text-left">
-                  <label className="text-[10px] uppercase font-bold text-text-secondary">Your Comment</label>
+                  <label className="text-[10px] uppercase font-bold text-stone-500">{t('reviewCommentLabel')}</label>
                   <textarea
                     rows={3}
-                    placeholder="Write your review here..."
+                    placeholder={t('reviewCommentPlaceholder')}
                     value={feedbackComment}
                     onChange={(e) => setFeedbackComment(e.target.value)}
-                    className="w-full mt-1 border border-border-color bg-bg-tertiary text-text-primary rounded-xl p-3 text-xs font-medium focus:outline-none"
+                    className="w-full mt-1 border border-stone-200 bg-stone-50 text-stone-900 rounded-xl p-2.5 text-xs font-medium focus:outline-none"
                   ></textarea>
                 </div>
 
@@ -862,16 +1165,15 @@ export default function CustomerMenu({
                   <button
                     type="button"
                     onClick={() => setShowFeedbackModal(false)}
-                    className="flex-1 py-3 text-xs font-bold rounded-xl border border-border-color text-text-secondary hover:bg-bg-tertiary"
+                    className="flex-1 py-2.5 text-xs font-bold rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-50"
                   >
-                    Close
+                    {t('closeButton')}
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 text-xs font-bold rounded-xl text-white hover:brightness-110"
-                    style={{ backgroundColor: 'var(--primary)' }}
+                    className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white"
                   >
-                    Submit Review
+                    {t('submitReviewButton')}
                   </button>
                 </div>
               </form>
@@ -880,50 +1182,47 @@ export default function CustomerMenu({
         </div>
       )}
 
+      {/* 12. WELCOME QR MODAL */}
       {showQrWelcomeModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[180] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-bg-secondary border border-border-color rounded-[28px] p-6 w-full max-w-sm shadow-2xl text-center text-text-primary">
-            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-              {renderIcon("QrCode", "w-8 h-8")}
+          <div className="bg-white border border-stone-200 rounded-[28px] p-6 w-full max-w-sm shadow-2xl text-center text-stone-900">
+            <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-amber-600 to-emerald-600 mx-auto mb-3 shadow">
+              <img 
+                src="/abu-coffee-logo.png" 
+                alt="Abu Coffee" 
+                className="w-full h-full rounded-full object-cover bg-black"
+              />
             </div>
-            <h3 className="text-xl font-black tracking-tight">Welcome to Abbuu Coffee</h3>
-            <p className="text-sm text-text-secondary mt-2 leading-relaxed">
-              This is a touchless digital menu. Scan the table QR code to begin browsing our coffeehouse favorites.
+            <h3 className="text-lg font-black tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+              {t('welcomeTitle')}
+            </h3>
+            <p className="text-xs text-stone-600 mt-1.5 leading-relaxed">
+              {t('welcomeDesc')}
             </p>
 
-            <div className="mt-5 text-left">
-              <label className="text-[10px] uppercase font-bold text-text-secondary">Optional table number</label>
+            <div className="mt-4 text-left">
+              <label className="text-[10px] uppercase font-bold text-stone-500">{t('whichTablePrompt')}</label>
               <input
                 type="number"
-                placeholder="e.g. 4"
+                placeholder={t('tableNumberPlaceholder')}
                 value={tableNumber}
                 onChange={(e) => setTableNumber(e.target.value)}
-                className="w-full mt-1.5 border border-border-color bg-bg-tertiary rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-primary"
+                className="w-full mt-1 border border-stone-200 bg-stone-50 rounded-xl p-2.5 text-sm font-black focus:outline-none focus:border-emerald-600 text-stone-900"
               />
             </div>
 
-            <div className="flex gap-2 mt-6">
-              <button
-                type="button"
-                onClick={handleQrWelcomeClose}
-                className="flex-1 py-3 text-sm font-bold rounded-xl border border-border-color text-text-secondary hover:bg-bg-tertiary"
-              >
-                Continue
-              </button>
-              <button
-                type="button"
-                onClick={handleQrWelcomeClose}
-                className="flex-1 py-3 text-sm font-bold rounded-xl text-white hover:brightness-110"
-                style={{ backgroundColor: 'var(--primary)' }}
-              >
-                I scanned it
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleQrWelcomeClose}
+              className="mt-5 w-full py-3 text-xs font-black uppercase tracking-wider rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white shadow-md shadow-emerald-700/25"
+            >
+              {t('exploreMenuButton')}
+            </button>
           </div>
         </div>
       )}
 
-      {/* Floating Detailed Inspect Modal */}
+      {/* 13. ITEM DETAIL MODAL (CUSTOMIZATIONS) */}
       {selectedItem && (
         <ItemDetailModal
           item={selectedItem}

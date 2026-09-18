@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import * as Icons from 'lucide-react';
 
 import { initialMenu, initialCategories } from './data/initialMenu';
 import CustomerMenu from './components/CustomerMenu';
 import AdminDashboard from './components/AdminDashboard';
-import ItemDetailModal from './components/ItemDetailModal';
+import { supabaseService, supabase } from './lib/supabase';
 
 export default function App() {
   // Global States
@@ -13,37 +12,38 @@ export default function App() {
   const [categories] = useState(initialCategories);
   const [activeTheme, setActiveTheme] = useState('forest');
   
-  // Seed initial values so analytics feels populated
+  // Seed initial values so analytics feels populated (matching inspiration dishes Total: $23.00)
   const [orders, setOrders] = useState([
     {
       id: 'ord-101',
       items: [
-        { name: 'Truffle Mushroom Soup', quantity: 1, finalTotalPrice: 8.00, finalUnitPrice: 8.00, selectedCustomizations: { 'Serving Temperature': 'Warm' } },
-        { name: 'Frothy Cappuccino', quantity: 1, finalTotalPrice: 3.50, finalUnitPrice: 3.50, selectedCustomizations: { 'Milk Choice': 'Whole Milk (Standard)' } }
+        { name: 'Bruschetta Caprese', quantity: 1, finalTotalPrice: 350.00, finalUnitPrice: 350.00, selectedCustomizations: {} },
+        { name: 'Classic Caesar Salad', quantity: 1, finalTotalPrice: 420.00, finalUnitPrice: 420.00, selectedCustomizations: {} },
+        { name: 'Creamy Fettuccine Alfredo', quantity: 1, finalTotalPrice: 520.00, finalUnitPrice: 520.00, selectedCustomizations: {} }
       ],
-      subtotal: 11.50,
+      subtotal: 1290.00,
       orderType: 'dine-in',
       tableNumber: '04',
       deliveryDetails: null,
-      timestamp: '06:14 PM',
+      timestamp: '11:30 AM',
       status: 'completed',
       offerApplied: null
     },
     {
       id: 'ord-102',
       items: [
-        { name: 'Chicken Tandoor', quantity: 1, finalTotalPrice: 16.00, finalUnitPrice: 16.00, selectedCustomizations: { 'Spice Intensity': 'Hot (Standard)' } },
-        { name: 'Single Espresso', quantity: 2, finalTotalPrice: 5.00, finalUnitPrice: 2.50, selectedCustomizations: { 'Shot Type': 'Single Shot' } }
+        { name: 'Traditional Jebena Buna Coffee', quantity: 2, finalTotalPrice: 240.00, finalUnitPrice: 120.00, selectedCustomizations: { 'Service': 'Cardamom Touch' } },
+        { name: 'Tiramisu with Abu Ethiopia Coffee', quantity: 1, finalTotalPrice: 340.00, finalUnitPrice: 340.00, selectedCustomizations: {} }
       ],
-      subtotal: 21.00,
+      subtotal: 580.00,
       orderType: 'delivery',
       tableNumber: null,
       deliveryDetails: {
-        name: 'Sarah Connor',
-        phone: '+1 (555) 9011',
-        address: '742 Evergreen Terrace, Sector 4'
+        name: 'Sofia Al-Hassan',
+        phone: '+251 91 123 4567',
+        address: 'Bole Medhanealem, Addis Ababa'
       },
-      timestamp: '06:45 PM',
+      timestamp: '10:45 AM',
       status: 'completed',
       offerApplied: null
     }
@@ -52,18 +52,15 @@ export default function App() {
   const [waiterCalls, setWaiterCalls] = useState([]);
   
   const [reviews, setReviews] = useState([
-    { tableNumber: 'Table 04', rating: 5, comment: 'The Truffle Mushroom Soup is absolutely legendary! Perfectly balanced flavor.', timestamp: '18/07/2026' },
-    { tableNumber: 'Delivery Client', rating: 4, comment: 'Chicken was spiced perfectly. Service was super quick.', timestamp: '18/07/2026' }
+    { tableNumber: 'Table 04', rating: 5, comment: 'The Bruschetta Caprese and Alfredo pasta were delicious. The Jebena Buna coffee is unmatched!', timestamp: 'Today' },
+    { tableNumber: 'Delivery Customer', rating: 5, comment: 'Ordering through WhatsApp was quick and convenient. Everything arrived hot and perfect.', timestamp: 'Yesterday' }
   ]);
 
-  const [restaurantName, setRestaurantName] = useState('Abbuu Coffee');
-  const [tagline, setTagline] = useState('Scan the QR code to explore our digital menu.');
+  const [restaurantName, setRestaurantName] = useState('Abu Coffee');
+  const [tagline, setTagline] = useState('Your menu, your orders, in one click · Digital QR menu with WhatsApp ordering');
 
   // Routing: isAdmin decides if we render merchant console or customer menu
   const [isAdmin, setIsAdmin] = useState(false);
-
-  // Floating detail modal target item
-  const [activeDetailItem, setActiveDetailItem] = useState(null);
 
   // Extract table/admin parameter from URL query (?table=4 or ?admin=true)
   const [initialTable, setInitialTable] = useState('');
@@ -81,20 +78,57 @@ export default function App() {
     }
   }, []);
 
+  // Supabase Data Hydration & Realtime Subscription
+  useEffect(() => {
+    if (!supabaseService.isConfigured()) return;
+
+    // Load initial data from Supabase
+    const loadRemoteData = async () => {
+      const remoteOrders = await supabaseService.getOrders();
+      if (remoteOrders && remoteOrders.length > 0) {
+        setOrders(remoteOrders);
+      }
+      const remoteCalls = await supabaseService.getWaiterCalls();
+      if (remoteCalls && remoteCalls.length > 0) {
+        setWaiterCalls(remoteCalls);
+      }
+    };
+    loadRemoteData();
+
+    // Subscribe to Realtime order events
+    if (supabase) {
+      const channel = supabase
+        .channel('public:orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
+          if (payload.eventType === 'INSERT') {
+            setOrders(prev => [payload.new, ...prev.filter(o => o.id !== payload.new.id)]);
+            playNotificationChime('order');
+          } else if (payload.eventType === 'UPDATE') {
+            setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, []);
+
   // Update default names if theme changes
   useEffect(() => {
     if (activeTheme === 'forest') {
-      setRestaurantName('Abbuu Coffee');
-      setTagline('Scan the QR code to explore our digital menu.');
+      setRestaurantName('Abu Coffee');
+      setTagline('Your menu, your orders, in one click · Digital QR menu with WhatsApp ordering');
     } else if (activeTheme === 'amber') {
-      setRestaurantName('Abbuu Coffee');
-      setTagline('Fresh pours, cozy corners, and a seamless digital menu.');
+      setRestaurantName('Abu Coffee');
+      setTagline('Authentic Ethiopian coffee and artisan cuisine · Simple, Modern, Fast');
     } else if (activeTheme === 'midnight') {
-      setRestaurantName('Abbuu Coffee');
-      setTagline('Sip, scan, and settle in with a modern cafe experience.');
+      setRestaurantName('Abu Coffee');
+      setTagline('Specialty coffee and gourmet lounge · Direct WhatsApp ordering');
     } else if (activeTheme === 'blossom') {
-      setRestaurantName('Abbuu Coffee');
-      setTagline('A bright coffeehouse experience from your phone.');
+      setRestaurantName('Abu Coffee');
+      setTagline('A warm, modern experience from your mobile phone.');
     }
   }, [activeTheme]);
 
@@ -131,13 +165,18 @@ export default function App() {
     }
   };
 
-  const handlePlaceOrder = (newOrderMetadata) => {
+  const handlePlaceOrder = async (newOrderMetadata) => {
     const fullOrder = {
       id: `ord-${Date.now().toString().slice(-4)}`,
       ...newOrderMetadata
     };
     
     setOrders(prev => [fullOrder, ...prev]);
+    
+    // Sync to Supabase if configured
+    if (supabaseService.isConfigured()) {
+      supabaseService.createOrder(fullOrder);
+    }
     
     confetti({
       particleCount: 100,
@@ -156,8 +195,11 @@ export default function App() {
     }
   };
 
-  const handleCallWaiter = (waiterCallMetadata) => {
+  const handleCallWaiter = async (waiterCallMetadata) => {
     setWaiterCalls(prev => [waiterCallMetadata, ...prev]);
+    if (supabaseService.isConfigured()) {
+      supabaseService.createWaiterCall(waiterCallMetadata);
+    }
     playNotificationChime('waiter');
   };
 
@@ -165,12 +207,19 @@ export default function App() {
     setReviews(prev => [newReview, ...prev]);
   };
 
-  const handleUpdateOrderStatus = (orderId, nextStatus) => {
+  const handleUpdateOrderStatus = async (orderId, nextStatus) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+    if (supabaseService.isConfigured()) {
+      supabaseService.updateOrderStatus(orderId, nextStatus);
+    }
   };
 
   const handleResolveWaiterCall = (indexToDismiss) => {
+    const callToResolve = waiterCalls[indexToDismiss];
     setWaiterCalls(prev => prev.filter((_, idx) => idx !== indexToDismiss));
+    if (callToResolve?.id && supabaseService.isConfigured()) {
+      supabaseService.resolveWaiterCall(callToResolve.id);
+    }
   };
 
   return (

@@ -11,39 +11,46 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-light: var(--text-light);
   --color-border-color: var(--border-color);
-  --font-heading: 'Outfit', 'Inter', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-heading: 'Outfit', 'Plus Jakarta Sans', 'Noto Sans Ethiopic', sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Noto Sans Ethiopic', sans-serif;
+  --font-body: 'Plus Jakarta Sans', 'Noto Sans Ethiopic', sans-serif;
 }
 
 :root {
-  /* Default: Forest Bistro Theme */
-  --primary: #0f5132;
-  --primary-hover: #146c43;
-  --primary-rgb: 15, 81, 50;
+  /* Default: Abu Coffee / Forest Theme */
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-rgb: 21, 128, 61;
   --accent: #d4af37;
   --accent-rgb: 212, 175, 55;
-  --bg-primary: #f4efe6;
+  --whatsapp: #25D366;
+  --whatsapp-hover: #1EBE5D;
+  --whatsapp-dark: #075E54;
+  --bg-primary: #f8f6f0;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #eae3d2;
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
+  --bg-tertiary: #f0ece1;
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
   --text-light: #ffffff;
-  --border-color: #e5e7eb;
+  --border-color: #e7e5e4;
 }
 
 /* Theme 1: Forest Bistro (Default / Emerald & Gold) */
 .theme-forest {
-  --primary: #0f5132;
-  --primary-hover: #146c43;
-  --primary-rgb: 15, 81, 50;
+  --primary: #15803d;
+  --primary-hover: #166534;
+  --primary-rgb: 21, 128, 61;
   --accent: #d4af37;
   --accent-rgb: 212, 175, 55;
-  --bg-primary: #f4efe6;
+  --whatsapp: #25D366;
+  --whatsapp-hover: #1EBE5D;
+  --whatsapp-dark: #075E54;
+  --bg-primary: #f8f6f0;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #eae3d2;
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
-  --border-color: #e5e7eb;
+  --bg-tertiary: #f0ece1;
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --border-color: #e7e5e4;
 }
 
 /* Theme 2: Amber Bistro (Warm Orange & Charcoal) */
@@ -99,6 +106,48 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: -0.025em;
+}
+
+/* Hide scrollbar for clean horizontal mobile carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-width: 0;
+  min-height: 100%;
+}
+
+button, input, textarea, select {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+.admin-language-selector > button {
+  background: #1f2232;
+  border-color: #2d3142;
+  color: #f3f4f6;
+}
+
+.admin-language-selector > button:hover {
+  background: #282c3f;
 }
 
 /* Scrollbar styling */
@@ -131,4 +180,42 @@ body {
     top: 50%;
     transform: translate(-50%, -50%) scale(1.2);
   }
+}
+
+/* Custom WhatsApp Button Glow and Ripple */
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+  }
+  50% {
+    box-shadow: 0 6px 22px rgba(37, 211, 102, 0.55);
+  }
+}
+
+.whatsapp-glow {
+  animation: pulse-subtle 2.5s infinite ease-in-out;
+}
+
+/* Chat bubble styling */
+.whatsapp-chat-bubble {
+  position: relative;
+  background-color: #dcf8c6;
+  border-radius: 16px 16px 4px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.whatsapp-chat-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  background: #dcf8c6;
+  clip-path: polygon(0 0, 0% 100%, 100% 100%);
+}
+
+.wood-texture {
+  background: linear-gradient(180deg, #5c3c24 0%, #3d2314 50%, #29160a 100%);
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), 0 8px 20px rgba(0,0,0,0.4);
 }

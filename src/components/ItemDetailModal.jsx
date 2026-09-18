@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import { dishImagesMap } from '../data/initialMenu';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ItemDetailModal({ item, onClose, onAddToCart }) {
+  const { t } = useLanguage();
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState({});
 
@@ -68,8 +70,8 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
         if (cust.type === 'single') {
           const selectedVal = selections[cust.name];
           if (selectedVal) {
-            // Check if option contains pricing e.g. "Oat Milk (+ $0.75)"
-            const match = selectedVal.match(/\+\s*\$\s*([0-9.]+)/);
+            // Check if option contains pricing e.g. "Oat Milk (+ 50 ETB)" or "(+ 50 ብር)"
+            const match = selectedVal.match(/\+\s*(?:ETB|\$)?\s*([0-9.]+)\s*(?:ETB|ብር)?/i);
             if (match) {
               total += parseFloat(match[1]);
             }
@@ -150,16 +152,15 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
   };
 
   return (
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-[200] flex flex-col justify-end transition-opacity duration-300 animate-fade-in">
-      {/* Scrollable Container wrapper to prevent clipping on small screen heights */}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] flex items-end justify-center p-0 transition-opacity duration-300 animate-fade-in">
       <div 
-        className="w-full max-h-[85%] bg-white rounded-t-[32px] shadow-2xl flex flex-col animate-slide-up overflow-y-auto"
+        className="w-full max-w-2xl max-h-[92dvh] bg-white rounded-t-[32px] shadow-2xl flex flex-col animate-slide-up overflow-y-auto"
         style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
       >
         {/* Header Drag Bar / Close Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100 bg-opacity-95 backdrop-blur-sm" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-          <h2 className="text-xl font-bold tracking-tight leading-none" style={{ fontFamily: 'var(--font-heading)' }}>
-            Dish Details
+        <div className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-opacity-95 backdrop-blur-sm" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight leading-none" style={{ fontFamily: 'var(--font-heading)' }}>
+            {t('dishDetailsTitle')}
           </h2>
           <button 
             onClick={onClose}
@@ -170,7 +171,7 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
           </button>
         </div>
 
-        <div className="px-6 pb-24 flex-1">
+        <div className="px-4 sm:px-6 pb-28 flex-1">
           {/* Cover Image/Graphics */}
           <div className="mt-2">
             {renderDishGraphics(item.image)}
@@ -183,7 +184,7 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
                 {item.name}
               </h3>
               <span className="text-xl font-black text-emerald-600 dark:text-emerald-400" style={{ color: 'var(--primary)' }}>
-                ${item.price.toFixed(2)}
+                {item.price} ETB
               </span>
             </div>
 
@@ -192,16 +193,16 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
               <div className="flex items-center gap-1">
                 {renderIcon("Star", "w-4 h-4 fill-amber-400 stroke-amber-400")}
                 <span className="text-gray-800 dark:text-gray-200 font-bold">{item.rating}</span>
-                <span>({item.reviews} reviews)</span>
+                <span>({item.reviews} {t('reviewsCount')})</span>
               </div>
               <div className="flex items-center gap-1">
                 {renderIcon("Clock", "w-4 h-4")}
-                <span>{item.prepTime}</span>
+                <span>{item.prepTime?.split(' ')[0]} {t('prepTimeLabel')}</span>
               </div>
               {item.calories && (
                 <div className="flex items-center gap-1">
                   {renderIcon("Flame", "w-4 h-4 text-orange-500")}
-                  <span>{item.calories} kcal</span>
+                  <span>{item.calories} {t('caloriesLabel')}</span>
                 </div>
               )}
             </div>
@@ -215,7 +216,7 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
           {/* Ingredients list */}
           {item.ingredients && (
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">Ingredients</h4>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">{t('ingredientsTitle')}</h4>
               <div className="flex flex-wrap gap-1.5">
                 {item.ingredients.map(ing => (
                   <span 
@@ -236,7 +237,7 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
               <div className="flex justify-between items-center mb-3">
                 <h4 className="text-sm font-bold uppercase tracking-wider">{cust.name}</h4>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 uppercase tracking-widest">
-                  {cust.type === 'single' ? "Select One" : "Optional (Multi)"}
+                  {cust.type === 'single' ? t('selectOneOption') : t('optionalMulti')}
                 </span>
               </div>
 
@@ -300,7 +301,7 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
                         <div className="flex items-center gap-3">
                           {opt.price > 0 && (
                             <span className="text-xs text-gray-500 font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                              +${opt.price.toFixed(2)}
+                              +{opt.price} ETB
                             </span>
                           )}
                           <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
@@ -324,9 +325,8 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
         </div>
 
         {/* Sticky Footer Cart Controls */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 border-t border-gray-100 bg-opacity-95 backdrop-blur-md flex items-center justify-between gap-4 z-20" style={{ backgroundColor: 'var(--bg-secondary)', borderTopColor: 'var(--border-color)' }}>
-          {/* Quantity Controls */}
-          <div className="flex items-center gap-2 border border-gray-200 rounded-xl p-1 bg-gray-50" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-tertiary)' }}>
+        <div className="sticky bottom-0 left-0 right-0 p-4 sm:p-5 border-t border-gray-100 bg-opacity-95 backdrop-blur-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 z-20" style={{ backgroundColor: 'var(--bg-secondary)', borderTopColor: 'var(--border-color)' }}>
+          <div className="flex items-center justify-between sm:justify-start gap-2 border border-gray-200 rounded-xl p-1 bg-gray-50 self-stretch sm:self-auto" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-tertiary)' }}>
             <button 
               onClick={() => setQuantity(q => Math.max(1, q - 1))}
               disabled={quantity === 1}
@@ -335,7 +335,7 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
             >
               {renderIcon("Minus", "w-4 h-4")}
             </button>
-            <span className="w-8 text-center font-bold text-base">{quantity}</span>
+            <span className="min-w-8 text-center font-bold text-base">{quantity}</span>
             <button 
               onClick={() => setQuantity(q => q + 1)}
               className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white active:scale-95 transition-all"
@@ -345,14 +345,13 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
             </button>
           </div>
 
-          {/* Add To Cart Button */}
           <button
             onClick={handleSubmit}
-            className="flex-1 py-4 px-6 rounded-2xl text-white font-extrabold text-sm tracking-wide flex items-center justify-between shadow-lg hover:brightness-110 active:scale-[0.98] transition-all"
+            className="flex-1 py-3.5 sm:py-4 px-4 sm:px-6 rounded-2xl text-white font-extrabold text-sm tracking-wide flex items-center justify-between gap-3 shadow-lg hover:brightness-110 active:scale-[0.98] transition-all"
             style={{ backgroundColor: 'var(--primary)' }}
           >
-            <span>Add to Order</span>
-            <span>${totalPrice.toFixed(2)}</span>
+            <span>{t('addToOrderButton')}</span>
+            <span>{totalPrice} ETB</span>
           </button>
         </div>
       </div>
