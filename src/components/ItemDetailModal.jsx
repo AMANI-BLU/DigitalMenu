@@ -3,9 +3,8 @@ import * as Icons from 'lucide-react';
 import { dishImagesMap } from '../data/initialMenu';
 import { useLanguage } from '../context/LanguageContext';
 
-export default function ItemDetailModal({ item, onClose, onAddToCart }) {
+export default function ItemDetailModal({ item, onClose }) {
   const { t } = useLanguage();
-  const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState({});
 
   // Initialize selections with first option for single selections
@@ -21,7 +20,6 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
       });
       setSelections(initial);
     }
-    setQuantity(1);
   }, [item]);
 
   if (!item) return null;
@@ -58,48 +56,6 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
         [customizationName]: updatedList
       };
     });
-  };
-
-  // Calculate current item price based on selections
-  const calculateSingleItemPrice = () => {
-    let total = item.price;
-    
-    // Add price increments from customizations
-    if (item.customizations) {
-      item.customizations.forEach(cust => {
-        if (cust.type === 'single') {
-          const selectedVal = selections[cust.name];
-          if (selectedVal) {
-            // Check if option contains pricing e.g. "Oat Milk (+ 50 ETB)" or "(+ 50 ብር)"
-            const match = selectedVal.match(/\+\s*(?:ETB|\$)?\s*([0-9.]+)\s*(?:ETB|ብር)?/i);
-            if (match) {
-              total += parseFloat(match[1]);
-            }
-          }
-        } else if (cust.type === 'multiple') {
-          const selectedVals = selections[cust.name] || [];
-          selectedVals.forEach(opt => {
-            total += opt.price || 0;
-          });
-        }
-      });
-    }
-    
-    return total;
-  };
-
-  const unitPrice = calculateSingleItemPrice();
-  const totalPrice = unitPrice * quantity;
-
-  const handleSubmit = () => {
-    onAddToCart({
-      ...item,
-      quantity,
-      selectedCustomizations: selections,
-      finalUnitPrice: unitPrice,
-      finalTotalPrice: totalPrice,
-    });
-    onClose();
   };
 
   const renderDishGraphics = (imageType) => {
@@ -324,34 +280,23 @@ export default function ItemDetailModal({ item, onClose, onAddToCart }) {
           ))}
         </div>
 
-        {/* Sticky Footer Cart Controls */}
-        <div className="sticky bottom-0 left-0 right-0 p-4 sm:p-5 border-t border-gray-100 bg-opacity-95 backdrop-blur-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 z-20" style={{ backgroundColor: 'var(--bg-secondary)', borderTopColor: 'var(--border-color)' }}>
-          <div className="flex items-center justify-between sm:justify-start gap-2 border border-gray-200 rounded-xl p-1 bg-gray-50 self-stretch sm:self-auto" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-tertiary)' }}>
-            <button 
-              onClick={() => setQuantity(q => Math.max(1, q - 1))}
-              disabled={quantity === 1}
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white active:scale-95 disabled:opacity-40 transition-all"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {renderIcon("Minus", "w-4 h-4")}
-            </button>
-            <span className="min-w-8 text-center font-bold text-base">{quantity}</span>
-            <button 
-              onClick={() => setQuantity(q => q + 1)}
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white active:scale-95 transition-all"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {renderIcon("Plus", "w-4 h-4")}
-            </button>
+        {/* Sticky Footer Showcase Controls */}
+        <div className="sticky bottom-0 left-0 right-0 p-4 sm:p-5 border-t border-gray-100 bg-opacity-95 backdrop-blur-md flex items-center justify-between gap-4 z-20" style={{ backgroundColor: 'var(--bg-secondary)', borderTopColor: 'var(--border-color)' }}>
+          <div className="text-left">
+            <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">
+              {t('basePrice')}
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400" style={{ color: 'var(--primary)' }}>
+              {item.price} ETB
+            </span>
           </div>
 
           <button
-            onClick={handleSubmit}
-            className="flex-1 py-3.5 sm:py-4 px-4 sm:px-6 rounded-2xl text-white font-extrabold text-sm tracking-wide flex items-center justify-between gap-3 shadow-lg hover:brightness-110 active:scale-[0.98] transition-all"
+            onClick={onClose}
+            className="py-3 px-6 rounded-2xl text-white font-extrabold text-sm tracking-wide shadow-md hover:brightness-110 active:scale-[0.98] transition-all"
             style={{ backgroundColor: 'var(--primary)' }}
           >
-            <span>{t('addToOrderButton')}</span>
-            <span>{totalPrice} ETB</span>
+            {t('closeModal')}
           </button>
         </div>
       </div>

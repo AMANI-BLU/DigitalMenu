@@ -142,6 +142,17 @@ export const translations = {
     tentWhatsAppBadge: 'Direct orders via WhatsApp',
     tentLanguagesSupported: 'Available in English · አማርኛ · Afaan Oromoo',
     
+    // Bank Transfer
+    transferBirr: 'Transfer Birr / Pay',
+    bankAccountsTitle: 'Bank Accounts & Mobile Pay',
+    bankAccountsSubtitle: 'Transfer directly using your mobile banking app. Show confirmation to staff.',
+    accountNameLabel: 'Account Name:',
+    accountNumberLabel: 'Account Number:',
+    copyAccount: 'Copy Number',
+    accountCopied: 'Copied!',
+    transferReceiptNotice: 'After completing the transfer, please show the confirmation SMS or receipt to your server.',
+    closeModal: 'Close',
+    
     // Alerts
     alertEnterTable: 'Please enter your table number',
     alertEnterDelivery: 'Please complete your delivery name, phone, and address',
@@ -285,6 +296,17 @@ export const translations = {
     tentWhatsAppBadge: 'ቀጥታ ትዕዛዝ በዋትስአፕ',
     tentLanguagesSupported: 'በእንግሊዝኛ · በአማርኛ · በኦሮምኛ ይገኛል',
     
+    // Bank Transfer
+    transferBirr: 'ብር ያስተላልፉ / ይክፈሉ',
+    bankAccountsTitle: 'የባንክ ሂሳቦች እና ሞባይል ክፍያ',
+    bankAccountsSubtitle: 'በሞባይል ባንኪንግ በቀጥታ ይክፈሉ። ደረሰኙን ለአስተናጋጁ ያሳዩ።',
+    accountNameLabel: 'የሂሳብ ስም፦',
+    accountNumberLabel: 'የሂሳብ ቁጥር፦',
+    copyAccount: 'ቁጥሩን ቅዳ',
+    accountCopied: 'ተገልብጧል!',
+    transferReceiptNotice: 'ክፍያውን ከፈጸሙ በኋላ የማረጋገጫ መልዕክቱን ለአስተናጋጁ ያሳዩ።',
+    closeModal: 'ዝጋ',
+    
     // Alerts
     alertEnterTable: 'እባክዎ የጠረጴዛ ቁጥርዎን ያስገቡ',
     alertEnterDelivery: 'እባክዎ ስምዎን፣ ስልክዎን እና አድራሻዎን ሙሉ ያድርጉ',
@@ -427,6 +449,17 @@ export const translations = {
     tentStep3: '3. Ajaja Ergaa',
     tentWhatsAppBadge: 'Ajaja kallattii WhatsApp tiin',
     tentLanguagesSupported: 'Ingiliffaan · Afaan Oromootiin · Amaariffaan kan qophaa\'e',
+    
+    // Bank Transfer
+    transferBirr: 'Birrii Dabarfaa / Kaffalaa',
+    bankAccountsTitle: 'Lakkoofsa Baankii fi Moobaayilaa',
+    bankAccountsSubtitle: 'Kallattiin baankii moobaayilaatiin kaffalaa. Nagahee agarsiisaa.',
+    accountNameLabel: 'Maqaa Herregaa:',
+    accountNumberLabel: 'Lakkoofsa Herregaa:',
+    copyAccount: 'Lakkoofsa Koppii Godhi',
+    accountCopied: 'Koppii ta\'eera!',
+    transferReceiptNotice: 'Kaffaltii erga raawwattanii booda nagahee ykn ergaa mirkaneessaa hojjetaatti agarsiisaa.',
+    closeModal: 'Cufi',
     
     // Alerts
     alertEnterTable: 'Moo deebi\'aa lakkoofsa minjee keessan galchaa',

@@ -2,14 +2,20 @@ import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 
 import { initialMenu, initialCategories } from './data/initialMenu';
+import { initialBankAccounts } from './data/initialBanks';
 import CustomerMenu from './components/CustomerMenu';
 import AdminDashboard from './components/AdminDashboard';
+import SplashScreen from './components/SplashScreen';
 import { supabaseService, supabase } from './lib/supabase';
 
 export default function App() {
+  // Brand Splash Screen state (luxurious animated entrance)
+  const [showSplash, setShowSplash] = useState(true);
+
   // Global States
   const [menu, setMenu] = useState(initialMenu);
   const [categories] = useState(initialCategories);
+  const [bankAccounts, setBankAccounts] = useState(initialBankAccounts);
   const [activeTheme, setActiveTheme] = useState('forest');
   
   // Seed initial values so analytics feels populated (matching inspiration dishes Total: $23.00)
@@ -91,6 +97,14 @@ export default function App() {
       const remoteCalls = await supabaseService.getWaiterCalls();
       if (remoteCalls && remoteCalls.length > 0) {
         setWaiterCalls(remoteCalls);
+      }
+      const remoteBanks = await supabaseService.getBankAccounts();
+      if (remoteBanks && remoteBanks.length > 0) {
+        setBankAccounts(remoteBanks);
+      }
+      const remoteReviews = await supabaseService.getReviews();
+      if (remoteReviews && remoteReviews.length > 0) {
+        setReviews(remoteReviews);
       }
     };
     loadRemoteData();
@@ -203,8 +217,11 @@ export default function App() {
     playNotificationChime('waiter');
   };
 
-  const handleAddReview = (newReview) => {
+  const handleAddReview = async (newReview) => {
     setReviews(prev => [newReview, ...prev]);
+    if (supabaseService.isConfigured()) {
+      await supabaseService.createReview(newReview);
+    }
   };
 
   const handleUpdateOrderStatus = async (orderId, nextStatus) => {
@@ -222,8 +239,22 @@ export default function App() {
     }
   };
 
+  const handleUpdateBankAccounts = async (newBanks) => {
+    setBankAccounts(newBanks);
+    if (supabaseService.isConfigured()) {
+      for (const bank of newBanks) {
+        await supabaseService.saveBankAccount(bank);
+      }
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-bg-primary font-body theme-${activeTheme} transition-colors duration-300`}>
+      {/* Luxury Animated Splash Screen on App Load */}
+      {showSplash && (
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      )}
+
       {isAdmin ? (
         // Render full width Admin Dashboard
         <AdminDashboard
@@ -235,6 +266,7 @@ export default function App() {
           theme={activeTheme}
           restaurantName={restaurantName}
           tagline={tagline}
+          bankAccounts={bankAccounts}
           onUpdateMenu={setMenu}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onResolveWaiterCall={handleResolveWaiterCall}
@@ -243,6 +275,7 @@ export default function App() {
             setRestaurantName(name);
             setTagline(tag);
           }}
+          onUpdateBankAccounts={handleUpdateBankAccounts}
           onToggleAdmin={() => setIsAdmin(false)}
         />
       ) : (
@@ -250,6 +283,7 @@ export default function App() {
         <CustomerMenu
           menu={menu}
           categories={categories}
+          bankAccounts={bankAccounts}
           theme={activeTheme}
           restaurantName={restaurantName}
           tagline={tagline}

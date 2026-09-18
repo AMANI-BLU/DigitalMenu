@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as Icons from 'lucide-react';
-import TableTentCard from './TableTentCard';
+import { QRCodeSVG } from 'qrcode.react';
 import LanguageSelector from './LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -13,18 +13,30 @@ export default function AdminDashboard({
   theme,
   restaurantName,
   tagline,
+  bankAccounts = [],
   onUpdateMenu,
   onUpdateOrderStatus,
   onResolveWaiterCall,
   onUpdateTheme,
   onUpdateRestaurantDetails,
+  onUpdateBankAccounts,
   onToggleAdmin
 }) {
   const { t, getLocalizedCategory, getLocalizedItem } = useLanguage();
   const localizedCategories = categories.map(getLocalizedCategory);
   const localizedMenu = menu.map(getLocalizedItem);
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'menu' | 'tables' | 'analytics' | 'settings'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'banks' | 'menu' | 'tables' | 'analytics' | 'settings'
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   
+  // Bank CRUD states
+  const [editingBank, setEditingBank] = useState(null);
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [bankFormName, setBankFormName] = useState('');
+  const [bankFormAccountName, setBankFormAccountName] = useState('');
+  const [bankFormAccountNumber, setBankFormAccountNumber] = useState('');
+  const [bankFormType, setBankFormType] = useState('cbe');
+  const [bankFormColor, setBankFormColor] = useState('#6a1b9a');
+
   // Menu CRUD states
   const [editingItem, setEditingItem] = useState(null);
   const [showMenuForm, setShowMenuForm] = useState(false);
@@ -35,11 +47,6 @@ export default function AdminDashboard({
   const [formImage, setFormImage] = useState('soup');
   const [formTags, setFormTags] = useState('');
   const [formIngredients, setFormIngredients] = useState('');
-
-  // Table QR generator states
-  const [tablesList, setTablesList] = useState([1, 2, 3, 4, 5]);
-  const [newTableNum, setNewTableNum] = useState('');
-  const [selectedTableForTent, setSelectedTableForTent] = useState(4);
 
   const renderIcon = (name, className = "w-4 h-4") => {
     const IconComponent = Icons[name] || Icons.HelpCircle;
@@ -109,20 +116,73 @@ export default function AdminDashboard({
     }
   };
 
-  const handleAddTable = (e) => {
-    e.preventDefault();
-    const tbl = parseInt(newTableNum);
-    if (tbl && !tablesList.includes(tbl)) {
-      setTablesList(prev => [...prev, tbl].sort((a,b)=>a-b));
-      setNewTableNum('');
-    }
+  const bankPresets = [
+    { type: 'cbe', name: 'Commercial Bank of Ethiopia (CBE)', color: '#6a1b9a' },
+    { type: 'telebirr', name: 'Telebirr', color: '#0070ba' },
+    { type: 'abyssinia', name: 'Bank of Abyssinia (BOA)', color: '#d4af37' },
+    { type: 'awash', name: 'Awash Bank', color: '#15803d' },
+    { type: 'dashen', name: 'Dashen Bank', color: '#1e3a8a' },
+    { type: 'other', name: 'Other Bank / Provider', color: '#475569' }
+  ];
+
+  const handleOpenAddBank = () => {
+    setEditingBank(null);
+    setBankFormName('Commercial Bank of Ethiopia (CBE)');
+    setBankFormAccountName('Abu Coffee PLC');
+    setBankFormAccountNumber('');
+    setBankFormType('cbe');
+    setBankFormColor('#6a1b9a');
+    setShowBankForm(true);
   };
 
-  const handleRemoveTable = (tblNum) => {
-    if (window.confirm(t('deleteTableConfirm', { table: tblNum }))) {
-      setTablesList(prev => prev.filter(t => t !== tblNum));
-      if (selectedTableForTent === tblNum) {
-        setSelectedTableForTent(tablesList[0] || null);
+  const handleOpenEditBank = (bank) => {
+    setEditingBank(bank);
+    setBankFormName(bank.bankName);
+    setBankFormAccountName(bank.accountName);
+    setBankFormAccountNumber(bank.accountNumber);
+    setBankFormType(bank.type || 'other');
+    setBankFormColor(bank.color || '#475569');
+    setShowBankForm(true);
+  };
+
+  const handlePresetSelect = (preset) => {
+    setBankFormType(preset.type);
+    if (!editingBank) {
+      setBankFormName(preset.name);
+    }
+    setBankFormColor(preset.color);
+  };
+
+  const handleSaveBank = (e) => {
+    e.preventDefault();
+    const bankItem = {
+      id: editingBank ? editingBank.id : `bank-${Date.now()}`,
+      bankName: bankFormName,
+      accountName: bankFormAccountName,
+      accountNumber: bankFormAccountNumber,
+      type: bankFormType,
+      color: bankFormColor
+    };
+
+    let updatedBanks;
+    if (editingBank) {
+      updatedBanks = bankAccounts.map(b => b.id === editingBank.id ? bankItem : b);
+    } else {
+      updatedBanks = [...bankAccounts, bankItem];
+    }
+
+    if (onUpdateBankAccounts) {
+      onUpdateBankAccounts(updatedBanks);
+    }
+    setShowBankForm(false);
+    setEditingBank(null);
+  };
+
+  const handleDeleteBank = (bankId) => {
+    if (window.confirm(t('deleteBankConfirm'))) {
+      const updated = bankAccounts.filter(b => b.id !== bankId);
+      if (onUpdateBankAccounts) {
+        onUpdateBankAccounts(updated);
       }
     }
   };
@@ -134,52 +194,67 @@ export default function AdminDashboard({
   const pendingCount = orders.filter(o => o.status === 'pending').length;
   const preparingCount = orders.filter(o => o.status === 'preparing').length;
 
+  const adminTabs = [
+    { id: 'orders', label: t('liveOrders'), icon: 'Inbox', badge: pendingCount > 0 ? pendingCount : null },
+    { id: 'banks', label: t('bankAccountsTab'), icon: 'Building2' },
+    { id: 'menu', label: t('menuCatalog'), icon: 'UtensilsCrossed' },
+    { id: 'analytics', label: t('salesKpi'), icon: 'BarChart3' },
+    { id: 'settings', label: t('storefrontSetup'), icon: 'Settings' }
+  ];
+
   return (
     <div className="flex flex-col min-h-screen bg-[#111319] text-gray-200">
       
-      {/* Subheader */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-6 py-3 sm:py-4 bg-[#171923] border-b border-[#252836] gap-3">
-        <div className="flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img 
-              src="/abu-coffee-logo.png" 
-              alt="Abu Coffee" 
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-amber-500/40 shadow-sm shrink-0"
-            />
-            <div className="min-w-0">
+      {/* Subheader with Hamburger on Mobile */}
+      <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 bg-[#171923] border-b border-[#252836] gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {/* Mobile Hamburger Drawer Trigger */}
+          <button 
+            onClick={() => setIsMobileDrawerOpen(true)}
+            className="md:hidden p-2 rounded-xl text-gray-300 hover:bg-[#1f2232] border border-[#2d3142] active:scale-95 transition-all shrink-0"
+            aria-label="Open navigation drawer"
+          >
+            {renderIcon("Menu", "w-5 h-5")}
+          </button>
+
+          <img 
+            src="/abu-coffee-logo.png" 
+            alt="Abu Coffee" 
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-amber-500/40 shadow-sm shrink-0"
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
               <h2 className="text-sm sm:text-base md:text-lg font-bold text-white leading-tight truncate">
                 {t('adminTitle')}
               </h2>
-              <p className="text-[10px] sm:text-xs text-gray-400 truncate">
-                {t('adminDescription', { restaurant: restaurantName })}
-              </p>
+              {/* Active Tab indicator on mobile */}
+              <span className="md:hidden text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
+                {adminTabs.find(t => t.id === activeTab)?.label}
+              </span>
             </div>
+            <p className="text-[10px] sm:text-xs text-gray-400 truncate hidden sm:block">
+              {t('adminDescription', { restaurant: restaurantName })}
+            </p>
           </div>
-          <button 
-            onClick={onToggleAdmin}
-            className="sm:hidden text-[11px] font-bold text-emerald-400 bg-emerald-950/40 px-2.5 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1 hover:bg-emerald-950/60 shrink-0"
-          >
-            {renderIcon("ShoppingBag", "w-3 h-3")} {t('viewStorefront')}
-          </button>
         </div>
 
-        {/* Right tools / Preparing Counters */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
+        {/* Right tools / Preparing Counters (Hidden on mobile nav to keep it clean!) */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button 
             onClick={onToggleAdmin}
             className="hidden sm:flex text-xs font-bold text-emerald-400 bg-emerald-950/30 px-3 py-1.5 rounded-full border border-emerald-500/20 items-center gap-1.5 hover:bg-emerald-950/60 transition-colors shrink-0"
           >
             {renderIcon("ShoppingBag", "w-3 h-3")} {t('viewStorefront')}
           </button>
-          <LanguageSelector variant="header" className="admin-language-selector shrink-0" />
-          <div className="bg-[#1f2232] rounded-xl px-2.5 sm:px-3 py-1.5 flex items-center gap-1.5 sm:gap-2 border border-[#2d3142] shrink-0">
+          <LanguageSelector variant="header" theme="dark" className="admin-language-selector shrink-0" />
+          <div className="hidden md:flex bg-[#1f2232] rounded-xl px-2.5 sm:px-3 py-1.5 items-center gap-1.5 sm:gap-2 border border-[#2d3142] shrink-0">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
             <div className="text-left leading-none">
               <span className="text-[8px] sm:text-[9px] text-gray-400 font-bold block uppercase">{t('preparing')}</span>
               <span className="text-xs sm:text-sm font-black text-white">{preparingCount}</span>
             </div>
           </div>
-          <div className="bg-[#1f2232] rounded-xl px-2.5 sm:px-3 py-1.5 flex items-center gap-1.5 sm:gap-2 border border-[#2d3142] shrink-0">
+          <div className="hidden md:flex bg-[#1f2232] rounded-xl px-2.5 sm:px-3 py-1.5 items-center gap-1.5 sm:gap-2 border border-[#2d3142] shrink-0">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
             <div className="text-left leading-none">
               <span className="text-[8px] sm:text-[9px] text-gray-400 font-bold block uppercase">{t('incoming')}</span>
@@ -189,24 +264,91 @@ export default function AdminDashboard({
         </div>
       </div>
 
+      {/* MOBILE DRAWER NAVIGATION (SLIDE OVER) */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[250] md:hidden flex animate-fade-in">
+          <div className="w-72 bg-[#171923] h-full border-r border-[#2d3142] shadow-2xl flex flex-col p-5 text-left animate-slide-right">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[#252836]">
+              <div className="flex items-center gap-2.5">
+                <img 
+                  src="/abu-coffee-logo.png" 
+                  alt="Abu Coffee" 
+                  className="w-9 h-9 rounded-full object-cover border border-amber-500/40"
+                />
+                <div>
+                  <h3 className="text-sm font-extrabold text-white leading-tight">Abu Coffee</h3>
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">{t('adminMenu')}</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-[#1f2232]"
+              >
+                {renderIcon("X", "w-5 h-5")}
+              </button>
+            </div>
+
+            {/* Navigation links in drawer */}
+            <div className="flex-1 py-4 space-y-1.5 overflow-y-auto">
+              {adminTabs.map(tab => {
+                const isSelected = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setIsMobileDrawerOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
+                      isSelected
+                        ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 shadow-xs'
+                        : 'border border-transparent text-gray-400 hover:text-gray-200 hover:bg-[#1f2232]'
+                    }`}
+                  >
+                    {renderIcon(tab.icon, `w-4 h-4 shrink-0 ${isSelected ? 'stroke-[2.5]' : ''}`)}
+                    <span className="flex-1">{tab.label}</span>
+                    {tab.badge && (
+                      <span className="px-2 py-0.5 text-[10px] bg-red-500 text-white rounded-full font-black leading-none">
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Drawer Bottom Tools */}
+            <div className="pt-4 border-t border-[#252836] space-y-3">
+              <LanguageSelector variant="drawer" theme="dark" className="admin-language-selector" />
+              <button
+                onClick={() => {
+                  setIsMobileDrawerOpen(false);
+                  onToggleAdmin();
+                }}
+                className="w-full py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-950/50 transition-all"
+              >
+                {renderIcon("ShoppingBag", "w-3.5 h-3.5")}
+                <span>{t('viewStorefront')}</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1" onClick={() => setIsMobileDrawerOpen(false)} />
+        </div>
+      )}
+
       {/* Main SaaS panel */}
       <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
-        {/* Sidebar tabs (Horizontally touch-scrollable on phone, vertical sidebar on desktop) */}
-        <div className="w-full md:w-60 bg-[#171923] border-b md:border-b-0 md:border-r border-[#252836] py-2 md:py-4 shrink-0">
-          <div className="flex md:flex-col gap-1.5 px-3 md:px-2 overflow-x-auto no-scrollbar scroll-smooth">
-            {[
-              { id: 'orders', label: t('liveOrders'), icon: 'Inbox', badge: pendingCount > 0 ? pendingCount : null },
-              { id: 'menu', label: t('menuCatalog'), icon: 'UtensilsCrossed' },
-              { id: 'tables', label: t('qrTentStand'), icon: 'QrCode' },
-              { id: 'analytics', label: t('salesKpi'), icon: 'BarChart3' },
-              { id: 'settings', label: t('storefrontSetup'), icon: 'Settings' }
-            ].map(tab => {
+        {/* Desktop Sidebar tabs (Clean vertical sidebar; hidden on mobile in favor of Drawer) */}
+        <div className="hidden md:block w-60 bg-[#171923] border-r border-[#252836] py-4 shrink-0">
+          <div className="flex flex-col gap-1.5 px-3">
+            {adminTabs.map(tab => {
               const isSelected = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 md:w-full ${
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap w-full ${
                     isSelected
                       ? 'bg-emerald-600/15 border border-emerald-500/30 text-emerald-400 shadow-xs'
                       : 'border border-transparent text-gray-400 hover:text-gray-200 hover:bg-[#1f2232]'
@@ -295,9 +437,9 @@ export default function AdminDashboard({
                                 </span>
                                 
                                 <p className="text-base font-extrabold text-white mt-2">
-                                  {order.orderType === 'dine-in' 
-                                    ? t('table', { table: order.tableNumber })
-                                    : t('deliveryOrderId', { id: order.id })
+                                  {order.deliveryDetails?.name 
+                                    ? order.deliveryDetails.name 
+                                    : (order.orderType === 'dine-in' ? `Dine-In Order #${order.id.slice(-4)}` : `Delivery #${order.id.slice(-4)}`)
                                   }
                                 </p>
                               </div>
@@ -412,7 +554,7 @@ export default function AdminDashboard({
                           >
                             <div className="flex justify-between items-center">
                               <span className="font-extrabold text-gray-200">
-                                {order.orderType === 'dine-in' ? t('table', { table: order.tableNumber }) : t('delivery')}
+                                {order.deliveryDetails?.name || (order.orderType === 'delivery' ? t('delivery') : `Order #${order.id.slice(-4)}`)}
                               </span>
                               <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
                                 order.status === 'completed' 
@@ -439,6 +581,103 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
+              </div>
+            </div>
+          )}
+
+          {/* TAB: BANK ACCOUNTS (MULTI-BANK MANAGEMENT) */}
+          {activeTab === 'banks' && (
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-[#171923] border border-[#252836] rounded-2xl">
+                <div>
+                  <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                    {renderIcon("Building2", "w-5 h-5 text-amber-400")}
+                    <span>{t('bankAccountsHeading')}</span>
+                  </h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {t('bankAccountsSubheading')}
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenAddBank}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-emerald-900/30 shrink-0"
+                >
+                  {renderIcon("Plus", "w-4 h-4")}
+                  <span>{t('addBankAccount')}</span>
+                </button>
+              </div>
+
+              {/* Grid of Bank Accounts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bankAccounts && bankAccounts.length > 0 ? (
+                  bankAccounts.map(bank => (
+                    <div
+                      key={bank.id}
+                      className="p-4 rounded-2xl bg-[#171923] border border-[#252836] hover:border-amber-500/40 transition-all flex flex-col justify-between shadow-xs relative group"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
+                              style={{ backgroundColor: bank.color || '#d97706' }}
+                            />
+                            <h3 className="font-extrabold text-sm text-white">{bank.bankName}</h3>
+                          </div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 bg-[#1e212f] px-2 py-0.5 rounded-md border border-[#2d3142]">
+                            {bank.type || 'bank'}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 space-y-2 text-xs">
+                          <div className="text-gray-400">
+                            <span className="text-[10px] uppercase font-bold text-gray-500 block">{t('accountHolder')}</span>
+                            <span className="font-semibold text-gray-200">{bank.accountName}</span>
+                          </div>
+                          <div className="pt-1">
+                            <span className="text-[10px] uppercase font-bold text-gray-500 block mb-1">{t('accountNumber')}</span>
+                            <div className="bg-[#1e212f] p-2.5 rounded-xl border border-[#2d3142] flex items-center justify-between">
+                              <span className="font-mono text-sm font-black text-amber-400 tracking-wider">
+                                {bank.accountNumber}
+                              </span>
+                              <span className="text-[9px] text-gray-500 font-semibold uppercase">{t('copyAccount')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Actions */}
+                      <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-[#252836]">
+                        <button
+                          onClick={() => handleOpenEditBank(bank)}
+                          className="p-2 rounded-xl bg-[#1e212f] text-gray-300 hover:text-white hover:bg-[#252836] transition-colors"
+                          title={t('editBank')}
+                        >
+                          {renderIcon("Pencil", "w-4 h-4")}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBank(bank.id)}
+                          className="p-2 rounded-xl bg-red-950/30 text-red-400 hover:bg-red-950/60 border border-red-900/40 transition-colors"
+                          title="Delete Bank"
+                        >
+                          {renderIcon("Trash2", "w-4 h-4")}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full border border-dashed border-[#2d3142] rounded-3xl py-12 text-center text-gray-400">
+                    <p className="text-sm font-bold">No bank accounts added yet.</p>
+                    <p className="text-xs text-gray-500 mt-1">Add your CBE, Telebirr, or other accounts for customer transfers.</p>
+                    <button
+                      onClick={handleOpenAddBank}
+                      className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2"
+                    >
+                      {renderIcon("Plus", "w-4 h-4")}
+                      <span>{t('addBankAccount')}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -512,94 +751,7 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* TAB 3: QR STAND TENT */}
-          {activeTab === 'tables' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1 flex flex-col gap-4 text-left">
-                <div>
-                  <h3 className="text-lg font-bold text-white leading-none">{t('scanToOrderSetup')}</h3>
-                  <p className="text-xs text-gray-400 mt-1">{t('scanToOrderDescription')}</p>
-                </div>
-
-                <form onSubmit={handleAddTable} className="flex gap-2 mt-2">
-                  <input
-                    type="number"
-                    required
-                    placeholder={t('enterTableNumber')}
-                    value={newTableNum}
-                    onChange={(e) => setNewTableNum(e.target.value)}
-                    className="flex-1 bg-[#171923] border border-[#2d3142] rounded-xl px-3 py-2 text-xs font-bold focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold"
-                  >
-                    {t('add')}
-                  </button>
-                </form>
-
-                <div className="flex flex-col gap-2 mt-2 max-h-[400px] overflow-y-auto">
-                  {tablesList.map(tbl => (
-                    <div 
-                      key={tbl}
-                      onClick={() => setSelectedTableForTent(tbl)}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
-                        selectedTableForTent === tbl
-                          ? 'bg-emerald-600/10 border-emerald-500/40 text-white'
-                          : 'bg-[#171923] border-[#252836] hover:bg-[#1e222f]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#252836] font-black text-sm flex items-center justify-center">
-                          {tbl}
-                        </div>
-                        <div className="leading-tight">
-                          <p className="font-extrabold text-xs">{t('table', { table: `#${tbl}` })}</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveTable(tbl);
-                        }}
-                        className="p-1 hover:text-rose-500 text-gray-400 transition-colors"
-                      >
-                        {renderIcon("Trash", "w-4 h-4")}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="lg:col-span-2 flex flex-col items-center gap-4">
-                <div className="w-full flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-sm font-extrabold uppercase tracking-wider text-gray-400">{t('tentPreview')}</h4>
-                  <button
-                    onClick={() => window.print()}
-                    className="px-4 py-2.5 bg-amber-500 text-black hover:brightness-110 rounded-xl text-xs font-black flex items-center gap-1.5 shadow"
-                  >
-                    {renderIcon("Printer", "w-4 h-4")} {t('printTentCard')}
-                  </button>
-                </div>
-
-                <div className="w-full p-3 sm:p-8 rounded-3xl bg-[#171923] border border-[#252836] flex items-center justify-center shadow-lg overflow-hidden">
-                  {selectedTableForTent ? (
-                    <TableTentCard
-                      tableNumber={selectedTableForTent}
-                      restaurantName={restaurantName}
-                      tagline={tagline}
-                      theme={theme}
-                    />
-                  ) : (
-                    <div className="text-gray-400 py-10">{t('selectTableTent')}</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: ANALYTICS */}
+          {/* TAB: ANALYTICS */}
           {activeTab === 'analytics' && (
             <div className="flex flex-col gap-6 text-left">
               <div>
@@ -683,7 +835,9 @@ export default function AdminDashboard({
                       reviews.map((rev, idx) => (
                         <div key={idx} className="p-3 bg-[#1e212f] rounded-xl border border-[#2b3042] text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-white">{rev.tableNumber}</span>
+                            <span className="font-bold text-white">
+                              {rev.tableNumber && !rev.tableNumber.toLowerCase().includes('table') ? rev.tableNumber : 'Customer Review'}
+                            </span>
                             <div className="flex gap-0.5">
                               {[1, 2, 3, 4, 5].map(st => (
                                 <Icons.Star 
@@ -769,6 +923,45 @@ export default function AdminDashboard({
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Storefront Menu QR Stand Card */}
+              <div className="p-5 bg-[#171923] border border-[#252836] rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-5 text-left">
+                <div className="flex-1">
+                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                    {renderIcon("QrCode", "w-4 h-4 text-emerald-400")}
+                    <span>Digital Menu QR Code</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                    Customers can scan this QR code with their phone cameras to instantly access your digital showcase menu, prices in ETB, and bank account transfer numbers.
+                  </p>
+                  <div className="mt-3.5 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow"
+                    >
+                      {renderIcon("Printer", "w-3.5 h-3.5")}
+                      <span>Print QR Stand</span>
+                    </button>
+                    <button
+                      onClick={onToggleAdmin}
+                      className="px-4 py-2 bg-[#1e212f] hover:bg-[#252836] text-gray-300 border border-[#2d3142] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                    >
+                      {renderIcon("ExternalLink", "w-3.5 h-3.5")}
+                      <span>Open Customer Menu</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-white rounded-2xl border border-stone-200 shadow-md flex flex-col items-center shrink-0">
+                  <QRCodeSVG
+                    value={typeof window !== 'undefined' ? window.location.origin : 'https://abu-coffee.et'}
+                    size={135}
+                    level="H"
+                    includeMargin={true}
+                  />
+                  <span className="text-[10px] font-black text-stone-900 mt-1">Abu Coffee Menu</span>
                 </div>
               </div>
             </div>
@@ -887,6 +1080,101 @@ export default function AdminDashboard({
                   className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:brightness-110"
                 >
                   Save Recipe
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Bank Account Add/Edit Modal */}
+      {showBankForm && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[300] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#171923] border border-[#2d3142] rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl text-left text-gray-200">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#252836]">
+              <h3 className="text-base font-extrabold tracking-tight text-white flex items-center gap-2">
+                {renderIcon("Building2", "w-5 h-5 text-amber-400")}
+                <span>{editingBank ? t('editBank') : t('addBankAccount')}</span>
+              </h3>
+              <button 
+                onClick={() => setShowBankForm(false)}
+                className="p-1 text-gray-400 hover:text-white rounded-lg"
+              >
+                {renderIcon("X", "w-5 h-5")}
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBank} className="flex flex-col gap-3.5">
+              {/* Preset Selector */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1.5">{t('bankType')}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {bankPresets.map(preset => (
+                    <button
+                      key={preset.type}
+                      type="button"
+                      onClick={() => handlePresetSelect(preset)}
+                      className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
+                        bankFormType === preset.type
+                          ? 'border-emerald-500 bg-emerald-950/30 text-emerald-400'
+                          : 'border-[#2d3142] bg-[#1e212f] text-gray-400 hover:border-gray-500'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full inline-block mr-1.5" style={{ backgroundColor: preset.color }} />
+                      <span className="capitalize">{preset.type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-400">{t('bankName')}</label>
+                <input
+                  type="text"
+                  required
+                  value={bankFormName}
+                  onChange={(e) => setBankFormName(e.target.value)}
+                  placeholder="e.g. Commercial Bank of Ethiopia"
+                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-400">{t('accountHolder')}</label>
+                <input
+                  type="text"
+                  required
+                  value={bankFormAccountName}
+                  onChange={(e) => setBankFormAccountName(e.target.value)}
+                  placeholder="e.g. Abu Coffee PLC"
+                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-400">{t('accountNumber')}</label>
+                <input
+                  type="text"
+                  required
+                  value={bankFormAccountNumber}
+                  onChange={(e) => setBankFormAccountNumber(e.target.value)}
+                  placeholder="e.g. 1000284918234 or 0911234567"
+                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-mono font-bold tracking-wider focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex gap-2.5 mt-3 pt-3 border-t border-[#252836]">
+                <button
+                  type="button"
+                  onClick={() => setShowBankForm(false)}
+                  className="flex-1 py-2.5 text-xs font-bold rounded-xl border border-[#2d3142] text-gray-400 hover:bg-[#1f2232]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40"
+                >
+                  {t('saveBank')}
                 </button>
               </div>
             </form>

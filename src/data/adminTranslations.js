@@ -90,6 +90,18 @@ const en = {
   statusPreparing: 'Preparing',
   statusCompleted: 'Completed',
   statusCancelled: 'Cancelled',
+  bankAccountsTab: 'Bank Accounts',
+  bankAccountsHeading: 'Restaurant Bank Accounts',
+  bankAccountsSubheading: 'Manage bank accounts and Telebirr details shown to customers for mobile transfers.',
+  addBankAccount: 'Add Bank Account',
+  bankName: 'Bank Name',
+  accountHolder: 'Account Holder Name',
+  accountNumber: 'Account Number',
+  bankType: 'Bank / Provider Type',
+  deleteBankConfirm: 'Are you sure you want to remove this bank account?',
+  saveBank: 'Save Account',
+  editBank: 'Edit Account',
+  adminMenu: 'Admin Menu',
 };
 
 const am = {
@@ -182,6 +194,18 @@ const am = {
   statusPreparing: 'በዝግጅት ላይ',
   statusCompleted: 'ተጠናቋል',
   statusCancelled: 'ተሰርዟል',
+  bankAccountsTab: 'የባንክ ሂሳቦች',
+  bankAccountsHeading: 'የምግብ ቤቱ የባንክ ሂሳቦች',
+  bankAccountsSubheading: 'ለደንበኞች የሚታዩትን የባንክ እና የቴሌብር መረጃዎች ያስተዳድሩ።',
+  addBankAccount: 'አዲስ ባንክ ጨምር',
+  bankName: 'የባንክ ስም',
+  accountHolder: 'የሂሳብ ባለቤት ስም',
+  accountNumber: 'የሂሳብ ቁጥር',
+  bankType: 'የባንክ ዓይነት',
+  deleteBankConfirm: 'ይህን የባንክ ሂሳብ መሰረዝ ይፈልጋሉ?',
+  saveBank: 'ሂሳቡን መዝግብ',
+  editBank: 'ሂሳቡን አርትዕ',
+  adminMenu: 'የአስተዳዳሪ ማውጫ',
 };
 
 const om = {
@@ -274,6 +298,18 @@ const om = {
   statusPreparing: 'Qophii Irra Jira',
   statusCompleted: 'Xumurameera',
   statusCancelled: 'Haqameera',
+  bankAccountsTab: 'Lakkoofsa Baankii',
+  bankAccountsHeading: 'Herrega Baankii Mana Nyaataa',
+  bankAccountsSubheading: 'Odeeffannoo baankii fi Teeleebirii maamiltootaaf mul\'atu bulchaa.',
+  addBankAccount: 'Baankii Haaraa Dabali',
+  bankName: 'Maqaa Baankii',
+  accountHolder: 'Maqaa Abbaa Herregaa',
+  accountNumber: 'Lakkoofsa Herregaa',
+  bankType: 'Gosa Baankii',
+  deleteBankConfirm: 'Herrega baankii kana haquu barbaadduu?',
+  saveBank: 'Herrega Olkaa\'i',
+  editBank: 'Herrega Gulaali',
+  adminMenu: 'Baafata Bulchaa',
 };
 
 export const adminTranslations = { en, am, om };
