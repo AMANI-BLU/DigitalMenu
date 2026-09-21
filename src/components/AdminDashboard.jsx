@@ -93,6 +93,7 @@ export default function AdminDashboard({
   restaurantName = '',
   tagline = '',
   bankAccounts = [],
+  menuVisible = true,
   adminEmail = '',
   onSaveMenuItem,
   onDeleteMenuItem,
@@ -105,6 +106,7 @@ export default function AdminDashboard({
   onPreviewSettings,
   onUpdateCredentials,
   onSignOut,
+  onToggleMenuVisibility,
 }) {
   const { t, getLocalizedCategory, getLocalizedItem } = useLanguage();
   const [activeTab, setActiveTab] = useState('menu');
@@ -173,6 +175,33 @@ export default function AdminDashboard({
                 <span>{tab.label}</span>
               </button>
             ))}
+
+            {/* Menu Visibility Quick Toggle */}
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{t('quickToggle')}</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${menuVisible ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                  <span className={`text-xs font-black ${menuVisible ? 'text-emerald-300' : 'text-red-300'}`}>
+                    {menuVisible ? t('menuStatusLive') : t('menuStatusHidden')}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onToggleMenuVisibility}
+                  title={menuVisible ? t('hideMenu') : t('showMenu')}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                    menuVisible ? 'bg-emerald-500' : 'bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      menuVisible ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
           </nav>
 
           <div className="space-y-2 border-t border-white/10 pt-4">
@@ -248,10 +277,12 @@ export default function AdminDashboard({
                 mode={mode}
                 restaurantName={restaurantName}
                 tagline={tagline}
+                menuVisible={menuVisible}
                 onSave={onUpdateSettings}
                 onPreview={onPreviewSettings}
                 adminEmail={adminEmail}
                 onUpdateCredentials={onUpdateCredentials}
+                onToggleMenuVisibility={onToggleMenuVisibility}
               />
             )}
           </div>
@@ -446,7 +477,7 @@ function handleImageUpload(event, setForm) {
   reader.readAsDataURL(file);
 }
 
-function SettingsTab({ t, theme, mode, restaurantName, tagline, onSave, onPreview, adminEmail, onUpdateCredentials }) {
+function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onSave, onPreview, adminEmail, onUpdateCredentials, onToggleMenuVisibility }) {
   const [form, setForm] = useState({ restaurantName, tagline, theme, mode });
   const [saving, setSaving] = useState(false);
   const [credentials, setCredentials] = useState({ email: '', password: '', confirmPassword: '' });
@@ -497,6 +528,48 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, onSave, onPrevie
   return (
     <>
       <PageHeading eyebrow={t('storefrontSetup')} title={t('storefrontSetup')} description={t('profileDescription')} />
+
+      {/* Menu Visibility Card */}
+      <div className={`mb-5 flex flex-col gap-4 rounded-3xl border-2 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6 ${
+        menuVisible
+          ? 'border-emerald-200 bg-emerald-50'
+          : 'border-red-200 bg-red-50'
+      }`}>
+        <div className="flex items-start gap-4">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+            menuVisible ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+          }`}>
+            {menuVisible
+              ? <Icons.Eye className="h-6 w-6" />
+              : <Icons.EyeOff className="h-6 w-6" />}
+          </div>
+          <div>
+            <p className={`text-sm font-black ${
+              menuVisible ? 'text-emerald-900' : 'text-red-900'
+            }`}>{t('menuVisibility')}</p>
+            <p className={`mt-1 text-xs leading-5 ${
+              menuVisible ? 'text-emerald-700' : 'text-red-700'
+            }`}>
+              {menuVisible ? t('menuVisible') : t('menuHidden')}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{t('menuVisibilityDescription')}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleMenuVisibility}
+          className={`inline-flex shrink-0 items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition ${
+            menuVisible
+              ? 'bg-red-600 text-white hover:bg-red-700'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+          }`}
+        >
+          {menuVisible
+            ? <><Icons.EyeOff className="h-4 w-4" />{t('hideMenu')}</>
+            : <><Icons.Eye className="h-4 w-4" />{t('showMenu')}</>}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-5">
         <form noValidate onSubmit={save} className="settings-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
