@@ -180,7 +180,7 @@ export default function CustomerMenu({
           >
             {mode === 'dark' ? <Icons.Sun className="h-4 w-4" /> : <Icons.Moon className="h-4 w-4" />}
           </button>
-          <LanguageSelector variant="header" />
+          <LanguageSelector variant="header" theme={mode === 'dark' ? 'dark' : 'light'} />
         </div>
       </header>
 
@@ -510,7 +510,7 @@ export default function CustomerMenu({
 
             {/* Drawer Links & Info */}
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
-              <LanguageSelector variant="drawer" />
+              <LanguageSelector variant="drawer" theme={mode === 'dark' ? 'dark' : 'light'} />
 
               <div className="space-y-1">
                 <button 

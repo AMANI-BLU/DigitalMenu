@@ -414,6 +414,7 @@ body {
 
 .mode-dark .customer-shell input,
 .mode-dark .customer-shell textarea,
+.mode-dark .customer-shell select,
 .mode-dark .admin-shell input,
 .mode-dark .admin-shell textarea,
 .mode-dark .admin-shell select,
@@ -421,6 +422,12 @@ body {
   background-color: #0f131c !important;
   color: #f8fafc !important;
   border-color: var(--border-color) !important;
+}
+
+/* Force native select dropdown popover to use dark colour-scheme */
+.mode-dark .customer-shell select,
+.mode-dark .admin-shell select {
+  color-scheme: dark;
 }
 
 .mode-dark .admin-login-error {
@@ -474,6 +481,7 @@ body {
 
 .theme-midnight.mode-dark .customer-shell input,
 .theme-midnight.mode-dark .customer-shell textarea,
+.theme-midnight.mode-dark .customer-shell select,
 .theme-midnight.mode-dark .admin-shell input,
 .theme-midnight.mode-dark .admin-shell textarea,
 .theme-midnight.mode-dark .admin-shell select {
