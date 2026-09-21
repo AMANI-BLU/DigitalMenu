@@ -306,6 +306,11 @@ function PageHeading({ eyebrow, title, description, action }) {
 
 function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, onAdd, onEdit, onDelete }) {
   const categoryNames = useMemo(() => Object.fromEntries(categories.map((category) => [category.id, getLocalizedCategory(category).name])), [categories, getLocalizedCategory]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const visibleMenu = useMemo(
+    () => selectedCategory === 'all' ? menu : menu.filter((item) => String(item.category) === String(selectedCategory)),
+    [menu, selectedCategory],
+  );
   return (
     <>
       <PageHeading
@@ -314,9 +319,19 @@ function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, 
         description={t('menuCatalogDescription')}
         action={<button type="button" onClick={onAdd} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"><Icons.Plus className="h-4 w-4" />{t('addDrink')}</button>}
       />
-      {menu.length === 0 ? <EmptyState icon={Icons.Utensils}>{t('emptyMenu')}</EmptyState> : (
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex min-w-0 items-center gap-2 text-xs font-black text-slate-600">
+          <span className="shrink-0">{t('filterCategory')}</span>
+          <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 sm:max-w-xs">
+            <option value="all">{t('allCategories')}</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{getLocalizedCategory(category).name}</option>)}
+          </select>
+        </label>
+        <span className="text-xs font-bold text-slate-400">{visibleMenu.length} {t('menuItemsLabel')}</span>
+      </div>
+      {menu.length === 0 ? <EmptyState icon={Icons.Utensils}>{t('emptyMenu')}</EmptyState> : visibleMenu.length === 0 ? <EmptyState icon={Icons.Search}>{t('noItemsFound')}</EmptyState> : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {menu.map((rawItem) => {
+          {visibleMenu.map((rawItem) => {
             const item = getLocalizedItem(rawItem);
             return (
               <article key={item.id} className="flex min-w-0 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row">

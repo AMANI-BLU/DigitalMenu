@@ -17,11 +17,9 @@ export default function CustomerMenu({
   const { t, getLocalizedCategory, getLocalizedItem } = useLanguage();
   const localizedCategories = categories.map(getLocalizedCategory);
   const localizedMenu = menu.map(getLocalizedItem);
-  const [selectedCategory, setSelectedCategory] = useState('starters');
+  const menuCategories = localizedCategories.filter((category) => localizedMenu.some((item) => String(item.category) === String(category.id)));
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterVegOnly, setFilterVegOnly] = useState(false);
-  const [filterSpicyOnly, setFilterSpicyOnly] = useState(false);
   
   // Modals and Drawers
   const [selectedItem, setSelectedItem] = useState(null);
@@ -38,8 +36,8 @@ export default function CustomerMenu({
   const categoryRefs = useRef({});
 
   useEffect(() => {
-    if (localizedCategories.length > 0 && !localizedCategories.some((category) => category.id === selectedCategory)) {
-      setSelectedCategory(localizedCategories[0].id);
+    if (selectedCategory !== 'all' && !localizedCategories.some((category) => String(category.id) === String(selectedCategory))) {
+      setSelectedCategory('all');
     }
   }, [categories, selectedCategory]);
 
@@ -71,7 +69,7 @@ export default function CustomerMenu({
   };
 
   const filteredMenu = localizedMenu.filter(item => {
-    if (item.category !== selectedCategory) return false;
+    if (selectedCategory !== 'all' && String(item.category) !== String(selectedCategory)) return false;
     
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -79,16 +77,6 @@ export default function CustomerMenu({
       const matchesDesc = item.description?.toLowerCase().includes(q);
       const matchesIng = item.ingredients && item.ingredients.some(ing => ing.toLowerCase().includes(q));
       if (!matchesName && !matchesDesc && !matchesIng) return false;
-    }
-
-    if (filterVegOnly) {
-      const isVeg = item.tags && item.tags.some(tag => /vegetarian|vegan|vegetariano|ተክል|Biqiltuu/i.test(tag));
-      if (!isVeg) return false;
-    }
-
-    if (filterSpicyOnly) {
-      const isSpicy = item.tags && item.tags.some(tag => /spicy|picante|ቅመም|Qaraawaa/i.test(tag));
-      if (!isSpicy) return false;
     }
 
     return true;
@@ -114,11 +102,13 @@ export default function CustomerMenu({
 
   const handleCategorySelect = (catId) => {
     setSelectedCategory(catId);
-    categoryRefs.current[catId]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-      inline: 'center'
-    });
+    if (catId !== 'all') {
+      categoryRefs.current[catId]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
   };
 
   const renderItemThumbnail = (imageKey, itemName) => {
@@ -195,7 +185,7 @@ export default function CustomerMenu({
       </header>
 
       {/* 2. HERO BANNER WITH BRAND LOGO & ACTIONS */}
-      <div className="relative pt-7 pb-6 px-6 bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 text-white text-center overflow-hidden">
+      <div className="theme-hero relative pt-7 pb-6 px-6 bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 text-white text-center overflow-hidden">
         {/* Ambient Coffee Glow & Background */}
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-overlay filter blur-[1px]"
@@ -260,8 +250,20 @@ export default function CustomerMenu({
       {/* 3. CATEGORIES HORIZONTAL CAROUSEL */}
       <nav aria-label={t('menuCategories')} className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 py-3 px-4 shadow-xs">
         <div className="flex gap-2 overflow-x-auto whitespace-nowrap hide-scrollbar scroll-smooth">
-          {localizedCategories.map(cat => {
-            const isSelected = selectedCategory === cat.id;
+          <button
+            type="button"
+            onClick={() => handleCategorySelect('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 shrink-0 ${
+              selectedCategory === 'all'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 scale-[1.02]'
+                : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50 hover:text-stone-900'
+            }`}
+          >
+            <Icons.LayoutGrid className={`w-3.5 h-3.5 ${selectedCategory === 'all' ? 'stroke-[2.5]' : ''}`} />
+            <span>{t('allCategories')}</span>
+          </button>
+          {menuCategories.map(cat => {
+            const isSelected = String(selectedCategory) === String(cat.id);
             return (
               <button
                 key={cat.id}
@@ -304,56 +306,18 @@ export default function CustomerMenu({
           )}
         </div>
 
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`h-9 px-3 rounded-xl flex items-center justify-center border transition-all text-xs font-bold gap-1.5 shadow-xs ${
-            showFilters || filterVegOnly || filterSpicyOnly
-              ? 'text-emerald-700 border-emerald-600 bg-emerald-50'
-              : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
-          }`}
-        >
-          <Icons.SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>{t('filters')}</span>
-        </button>
-      </div>
-
-      {/* Expanded filters */}
-      {showFilters && (
-        <div className="mx-4 mt-2 p-2.5 bg-white rounded-xl border border-stone-200 shadow-xs flex items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setFilterVegOnly(!filterVegOnly)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
-                filterVegOnly 
-                  ? 'bg-emerald-600 border-emerald-600 text-white' 
-                  : 'bg-stone-50 border-stone-200 text-stone-600'
-              }`}
-            >
-              <Icons.Leaf className="w-3 h-3" /> {t('filterVegetarian')}
-            </button>
-            <button 
-              onClick={() => setFilterSpicyOnly(!filterSpicyOnly)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
-                filterSpicyOnly 
-                  ? 'bg-rose-600 border-rose-600 text-white' 
-                  : 'bg-stone-50 border-stone-200 text-stone-600'
-              }`}
-            >
-              <Icons.Flame className="w-3 h-3" /> {t('filterSpicy')}
-            </button>
-          </div>
-          <button 
-            onClick={() => {
-              setFilterVegOnly(false);
-              setFilterSpicyOnly(false);
-              setShowFilters(false);
-            }}
-            className="text-[11px] font-bold text-stone-400 hover:text-stone-700"
+        <label className="relative shrink-0">
+          <span className="sr-only">{t('filterCategory')}</span>
+          <select
+            value={selectedCategory}
+            onChange={(e) => handleCategorySelect(e.target.value)}
+            className="h-9 max-w-[10rem] rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 shadow-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
           >
-            {t('filterClear')}
-          </button>
-        </div>
-      )}
+            <option value="all">{t('allCategories')}</option>
+            {menuCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+        </label>
+      </div>
 
       {/* 5. HOT DRINKS / ITEMS LIST */}
       <main className="w-full max-w-5xl mx-auto px-4 mt-4 flex-1">

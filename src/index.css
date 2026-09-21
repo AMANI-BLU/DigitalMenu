@@ -71,23 +71,23 @@
   --border-color: #ebdcb9;
 }
 
-/* Theme 3: Midnight Luxury (Sleek Dark & Crimson/Gold) */
+/* Theme 3: Midnight Luxury (navy, blue, and gold) */
 .theme-midnight {
-  --primary: #4f8fe8;
-  --primary-hover: #70a8f2;
-  --primary-rgb: 79, 143, 232;
-  --accent: #f2c078;
-  --accent-rgb: 242, 192, 120;
-  --bg-primary: #0e2038;
-  --bg-secondary: #182f4e;
-  --bg-tertiary: #203b5d;
-  --surface: #0e2038;
-  --card-surface: #182f4e;
-  --shell-text: #edf5ff;
-  --text-primary: #edf5ff;
-  --text-secondary: #b7c9df;
-  --border-color: #345477;
-  --shadow-color: rgba(4, 17, 35, 0.45);
+  --primary: #1d4ed8;
+  --primary-hover: #1e40af;
+  --primary-rgb: 29, 78, 216;
+  --accent: #c58b38;
+  --accent-rgb: 197, 139, 56;
+  --bg-primary: #f4f7fc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e9eff9;
+  --surface: #f4f7fc;
+  --card-surface: #ffffff;
+  --shell-text: #17233b;
+  --text-primary: #17233b;
+  --text-secondary: #52617a;
+  --border-color: #d8e2f2;
+  --shadow-color: rgba(23, 35, 59, 0.12);
 }
 
 /* Theme 4: Blossom Cafe (Soft Pink & Sage) */
@@ -134,10 +134,21 @@ body {
 }
 
 .theme-midnight.mode-dark {
+  --primary: #4f8fe8;
+  --primary-hover: #70a8f2;
+  --primary-rgb: 79, 143, 232;
+  --accent: #f2c078;
+  --accent-rgb: 242, 192, 120;
+  --bg-primary: #0e2038;
+  --bg-secondary: #182f4e;
+  --bg-tertiary: #203b5d;
   --surface: #0e2038;
   --card-surface: #182f4e;
   --shell-text: #edf5ff;
+  --text-primary: #edf5ff;
+  --text-secondary: #b7c9df;
   --border-color: #345477;
+  --shadow-color: rgba(4, 17, 35, 0.45);
 }
 
 .customer-shell,
@@ -202,23 +213,23 @@ body {
   border-color: var(--border-color) !important;
 }
 
-.theme-midnight .customer-shell header,
-.theme-midnight .customer-shell nav,
-.theme-midnight .customer-shell .bg-white,
-.theme-midnight .admin-shell .bg-white,
-.theme-midnight .admin-shell header {
+.theme-midnight.mode-dark .customer-shell header,
+.theme-midnight.mode-dark .customer-shell nav,
+.theme-midnight.mode-dark .customer-shell .bg-white,
+.theme-midnight.mode-dark .admin-shell .bg-white,
+.theme-midnight.mode-dark .admin-shell header {
   background-color: var(--card-surface) !important;
   color: var(--shell-text) !important;
   border-color: var(--border-color) !important;
 }
 
-.theme-midnight .customer-shell .text-stone-900,
-.theme-midnight .customer-shell .text-stone-800,
-.theme-midnight .customer-shell .text-stone-700,
-.theme-midnight .admin-shell .text-slate-950,
-.theme-midnight .admin-shell .text-slate-900,
-.theme-midnight .admin-shell .text-slate-800,
-.theme-midnight .admin-shell .text-slate-700 {
+.theme-midnight.mode-dark .customer-shell .text-stone-900,
+.theme-midnight.mode-dark .customer-shell .text-stone-800,
+.theme-midnight.mode-dark .customer-shell .text-stone-700,
+.theme-midnight.mode-dark .admin-shell .text-slate-950,
+.theme-midnight.mode-dark .admin-shell .text-slate-900,
+.theme-midnight.mode-dark .admin-shell .text-slate-800,
+.theme-midnight.mode-dark .admin-shell .text-slate-700 {
   color: var(--shell-text) !important;
 }
 
@@ -228,6 +239,10 @@ body {
 .theme-midnight.mode-dark .admin-shell textarea,
 .theme-midnight.mode-dark .admin-shell select {
   background-color: #102943 !important;
+}
+
+.theme-midnight.mode-light .customer-shell .theme-hero {
+  background-image: linear-gradient(135deg, #132b56 0%, #1d4ed8 58%, #244b83 100%) !important;
 }
 
 :is(.theme-amber, .theme-midnight, .theme-blossom) .bg-emerald-700,
