@@ -51,6 +51,7 @@ const mapMenuItem = (item) => ({
   ingredients: item.ingredients || [],
   customizations: item.customizations || [],
   translations: item.translations || {},
+  active: item.active !== false,
 });
 
 const mapBankAccount = (bank) => ({
@@ -159,13 +160,11 @@ export const supabaseService = {
     return true;
   },
 
-  async getMenuItems() {
+  async getMenuItems(adminMode = false) {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('menu_items')
-      .select('*')
-      .eq('active', true)
-      .order('created_at', { ascending: true });
+    let query = supabase.from('menu_items').select('*').order('created_at', { ascending: true });
+    if (!adminMode) query = query.eq('active', true);
+    const { data, error } = await query;
     return throwIfError({ data: (data || []).map(mapMenuItem), error });
   },
 
@@ -185,9 +184,20 @@ export const supabaseService = {
       ingredients: item.ingredients || [],
       customizations: item.customizations || [],
       translations: item.translations || { en: { name: item.name, description: item.description || '' } },
-      active: true,
+      active: item.active !== false,
     };
     const { data, error } = await supabase.from('menu_items').upsert(payload).select().single();
+    return mapMenuItem(throwIfError({ data, error }));
+  },
+
+  async toggleMenuItemAvailability(itemId, active) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const { data, error } = await supabase
+      .from('menu_items')
+      .update({ active })
+      .eq('id', itemId)
+      .select()
+      .single();
     return mapMenuItem(throwIfError({ data, error }));
   },
 

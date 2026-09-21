@@ -97,6 +97,7 @@ export default function AdminDashboard({
   adminEmail = '',
   onSaveMenuItem,
   onDeleteMenuItem,
+  onToggleMenuItemAvailability,
   onSaveCategory,
   onDeleteCategory,
   onSaveBankAccount,
@@ -246,6 +247,7 @@ export default function AdminDashboard({
                 onAdd={() => setMenuModal({ item: null })}
                 onEdit={(item) => setMenuModal({ item })}
                 onDelete={(id) => askConfirm({ title: t('deleteDrinkTitle'), message: t('deleteItemConfirm'), onConfirm: () => onDeleteMenuItem(id) })}
+                onToggleAvailability={onToggleMenuItemAvailability}
               />
             )}
             {activeTab === 'categories' && (
@@ -335,7 +337,7 @@ function PageHeading({ eyebrow, title, description, action }) {
   );
 }
 
-function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, onAdd, onEdit, onDelete }) {
+function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, onAdd, onEdit, onDelete, onToggleAvailability }) {
   const categoryNames = useMemo(() => Object.fromEntries(categories.map((category) => [category.id, getLocalizedCategory(category).name])), [categories, getLocalizedCategory]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const visibleMenu = useMemo(
@@ -364,10 +366,16 @@ function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {visibleMenu.map((rawItem) => {
             const item = getLocalizedItem(rawItem);
+            const isAvailable = rawItem.active !== false;
             return (
-              <article key={item.id} className="flex min-w-0 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row">
-                <div className="h-28 w-full shrink-0 overflow-hidden rounded-2xl bg-emerald-50 sm:w-28">
+              <article key={item.id} className={`flex min-w-0 flex-col gap-4 rounded-3xl border bg-white p-4 shadow-sm sm:flex-row transition-opacity ${isAvailable ? 'border-slate-200 opacity-100' : 'border-slate-200 opacity-60'}`}>
+                <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-2xl bg-emerald-50 sm:w-28">
                   {item.image?.startsWith('http') || item.image?.startsWith('data:image/') ? <img src={item.image} alt={item.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-emerald-700">{renderIcon('Coffee', 'h-8 w-8')}</div>}
+                  {!isAvailable && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 rounded-2xl">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-white bg-slate-800/80 px-2 py-0.5 rounded-full">Hidden</span>
+                    </div>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -378,9 +386,25 @@ function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, 
                     <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800">{item.price} ETB</span>
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-500">{item.description || t('noDescription')}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button type="button" onClick={() => onEdit(rawItem)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"><Icons.Pencil className="h-3.5 w-3.5" />{t('edit')}</button>
                     <button type="button" onClick={() => onDelete(item.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-100 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-50"><Icons.Trash2 className="h-3.5 w-3.5" />{t('delete')}</button>
+                    {/* Availability Toggle */}
+                    {onToggleAvailability && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleAvailability(item.id, !isAvailable)}
+                        className={`ml-auto inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition ${
+                          isAvailable
+                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                            : 'border border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                        title={isAvailable ? 'Hide from customers' : 'Make visible to customers'}
+                      >
+                        {isAvailable ? <Icons.Eye className="h-3.5 w-3.5" /> : <Icons.EyeOff className="h-3.5 w-3.5" />}
+                        {isAvailable ? 'Available' : 'Hidden'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </article>

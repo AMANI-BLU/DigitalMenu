@@ -69,6 +69,9 @@ export default function CustomerMenu({
   };
 
   const filteredMenu = localizedMenu.filter(item => {
+    // Never show hidden items to customers
+    if (item.active === false) return false;
+
     if (selectedCategory !== 'all' && String(item.category) !== String(selectedCategory)) return false;
     
     if (searchQuery) {

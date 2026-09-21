@@ -33,11 +33,11 @@ export default function App() {
     return saved === 'dark' || saved === 'light' ? saved : '';
   });
 
-  const loadPublicData = async () => {
+  const loadPublicData = async (adminMode = false) => {
     setDataLoading(true);
     try {
       const [remoteMenu, remoteCategories, remoteBanks, remoteSettings] = await Promise.all([
-        supabaseService.getMenuItems(),
+        supabaseService.getMenuItems(adminMode),
         supabaseService.getCategories(),
         supabaseService.getBankAccounts(),
         supabaseService.getSettings(),
@@ -84,6 +84,7 @@ export default function App() {
         if (currentSession && await supabaseService.isAdminUser(currentSession.user)) {
           setSession(currentSession);
           setIsAdmin(true);
+          await loadPublicData(true);
           await loadAdminData();
         }
       } catch (authError) {
@@ -97,6 +98,7 @@ export default function App() {
           if (nextSession && await supabaseService.isAdminUser(nextSession.user)) {
             setSession(nextSession);
             setIsAdmin(true);
+            await loadPublicData(true);
             await loadAdminData();
           } else {
             setSession(null);
@@ -130,6 +132,13 @@ export default function App() {
         const withoutSaved = current.filter((entry) => entry.id !== saved.id);
         return [...withoutSaved, saved];
       }),
+    );
+  };
+
+  const handleToggleMenuItemAvailability = async (itemId, active) => {
+    await withRefresh(
+      () => supabaseService.toggleMenuItemAvailability(itemId, active),
+      (saved) => setMenu((current) => current.map((item) => item.id === saved.id ? saved : item)),
     );
   };
 
@@ -219,6 +228,8 @@ export default function App() {
   const openAdmin = () => {
     setAdminRequested(true);
     window.history.replaceState({}, '', `${window.location.pathname}?admin=true`);
+    // Reload menu with all items (including hidden) for admin view
+    loadPublicData(true);
   };
 
   const closeAdmin = async () => {
@@ -284,6 +295,7 @@ export default function App() {
           adminEmail={session?.user?.email || ''}
           onSaveMenuItem={handleSaveMenuItem}
           onDeleteMenuItem={handleDeleteMenuItem}
+          onToggleMenuItemAvailability={handleToggleMenuItemAvailability}
           onSaveCategory={handleSaveCategory}
           onDeleteCategory={handleDeleteCategory}
           onSaveBankAccount={handleSaveBankAccount}
