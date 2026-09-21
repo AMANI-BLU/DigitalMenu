@@ -248,16 +248,12 @@ export default function CustomerMenu({
       </div>
 
       {/* 3. CATEGORIES HORIZONTAL CAROUSEL */}
-      <nav aria-label={t('menuCategories')} className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 py-3 px-4 shadow-xs">
-        <div className="flex gap-2 overflow-x-auto whitespace-nowrap hide-scrollbar scroll-smooth">
+      <nav aria-label={t('menuCategories')} className="customer-category-nav sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
+        <div className="category-scroller hide-scrollbar">
           <button
             type="button"
             onClick={() => handleCategorySelect('all')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 shrink-0 ${
-              selectedCategory === 'all'
-                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 scale-[1.02]'
-                : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50 hover:text-stone-900'
-            }`}
+            className={`category-pill ${selectedCategory === 'all' ? 'category-pill-active' : ''}`}
           >
             <Icons.LayoutGrid className={`w-3.5 h-3.5 ${selectedCategory === 'all' ? 'stroke-[2.5]' : ''}`} />
             <span>{t('allCategories')}</span>
@@ -266,14 +262,10 @@ export default function CustomerMenu({
             const isSelected = String(selectedCategory) === String(cat.id);
             return (
               <button
-                key={cat.id}
+              key={cat.id}
                 ref={el => categoryRefs.current[cat.id] = el}
                 onClick={() => handleCategorySelect(cat.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 shrink-0 ${
-                  isSelected 
-                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 scale-[1.02]' 
-                    : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50 hover:text-stone-900'
-                }`}
+                className={`category-pill ${isSelected ? 'category-pill-active' : ''}`}
               >
                 {renderIcon(cat.icon, `w-3.5 h-3.5 ${isSelected ? 'stroke-[2.5]' : ''}`)}
                 <span>{cat.name}</span>
@@ -284,38 +276,40 @@ export default function CustomerMenu({
       </nav>
 
       {/* 4. SEARCH & QUICK FILTERS */}
-      <div className="w-full max-w-4xl mx-auto px-4 pt-3.5 flex gap-2">
-        <div className="relative flex-1">
+      <div className="customer-filter-bar">
+        <div className="customer-search">
           <input
             type="text"
             placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white rounded-xl py-2.5 pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600 border border-stone-200 shadow-xs"
+            className="customer-search-input"
           />
-          <div className="absolute left-3 top-2.5 text-stone-400">
+          <div className="customer-search-icon">
             <Icons.Search className="w-4 h-4" />
           </div>
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600"
+              className="customer-search-clear"
+              aria-label={t('clearSearch')}
             >
               <Icons.X className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        <label className="relative shrink-0">
+        <label className="customer-category-filter">
           <span className="sr-only">{t('filterCategory')}</span>
           <select
             value={selectedCategory}
             onChange={(e) => handleCategorySelect(e.target.value)}
-            className="h-9 max-w-[10rem] rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 shadow-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20"
+            className="customer-category-select"
           >
             <option value="all">{t('allCategories')}</option>
             {menuCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
+          <Icons.ChevronDown className="customer-category-chevron" aria-hidden="true" />
         </label>
       </div>
 

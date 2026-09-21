@@ -242,7 +242,7 @@ export default function App() {
   if (adminRequested && !isAdmin) {
     return (
       <div className={appClassName}>
-        <AdminLogin onAuthenticated={async (nextSession) => {
+        <AdminLogin theme={store.theme} mode={effectiveMode} onToggleMode={handleToggleMode} onAuthenticated={async (nextSession) => {
           setSession(nextSession);
           setIsAdmin(true);
           await loadAdminData();
