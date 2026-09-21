@@ -1,9 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import * as Icons from 'lucide-react';
 import ItemDetailModal from './ItemDetailModal';
 import LanguageSelector from './LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
-import { dishImagesMap } from '../data/initialMenu';
 
 export default function CustomerMenu({ 
   menu = [], 
@@ -11,9 +10,12 @@ export default function CustomerMenu({
   bankAccounts = [],
   onSubmitFeedback, 
   restaurantName = 'Abu Coffee',
-  onToggleAdmin
+  onToggleAdmin,
+  mode = 'light',
+  onToggleMode,
 }) {
-  const { t, getLocalizedItem } = useLanguage();
+  const { t, getLocalizedCategory, getLocalizedItem } = useLanguage();
+  const localizedCategories = categories.map(getLocalizedCategory);
   const localizedMenu = menu.map(getLocalizedItem);
   const [selectedCategory, setSelectedCategory] = useState('starters');
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +36,12 @@ export default function CustomerMenu({
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   const categoryRefs = useRef({});
+
+  useEffect(() => {
+    if (localizedCategories.length > 0 && !localizedCategories.some((category) => category.id === selectedCategory)) {
+      setSelectedCategory(localizedCategories[0].id);
+    }
+  }, [categories, selectedCategory]);
 
   const renderIcon = (name, className = "w-4 h-4") => {
     const IconComponent = Icons[name] || Icons.HelpCircle;
@@ -114,13 +122,13 @@ export default function CustomerMenu({
   };
 
   const renderItemThumbnail = (imageKey, itemName) => {
-    const imageUrl = dishImagesMap[imageKey] || (imageKey && imageKey.startsWith('http') ? imageKey : null);
+    const imageSource = imageKey && (imageKey.startsWith('http') || imageKey.startsWith('data:image/')) ? imageKey : null;
 
-    if (imageUrl) {
+    if (imageSource) {
       return (
         <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 shadow-xs border border-stone-200/80 relative bg-stone-100 group">
           <img 
-            src={imageUrl} 
+            src={imageSource}
             alt={itemName} 
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
@@ -137,7 +145,7 @@ export default function CustomerMenu({
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto min-h-screen bg-[#faf8f5] text-stone-900 flex flex-col relative shadow-2xl border-x border-stone-200 font-body pb-16">
+    <div className="customer-shell w-full max-w-6xl mx-auto min-h-screen bg-[#faf8f5] text-stone-900 flex flex-col relative shadow-2xl border-x border-stone-200 font-body pb-16">
       
       {/* 1. TOP APP BAR */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 px-4 sm:px-6 py-3 flex items-center justify-between shadow-xs min-h-16">
@@ -172,6 +180,15 @@ export default function CustomerMenu({
             <Icons.CreditCard className="w-3.5 h-3.5 text-amber-700" />
             <span className="hidden sm:inline">{t('transferBirr')}</span>
             <span className="sm:hidden font-mono font-bold text-[11px]">ETB</span>
+          </button>
+          <button
+            type="button"
+            onClick={onToggleMode}
+            aria-label={t(mode === 'dark' ? 'lightMode' : 'darkMode')}
+            title={t(mode === 'dark' ? 'lightMode' : 'darkMode')}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 bg-stone-100 text-stone-700 transition hover:bg-stone-200"
+          >
+            {mode === 'dark' ? <Icons.Sun className="h-4 w-4" /> : <Icons.Moon className="h-4 w-4" />}
           </button>
           <LanguageSelector variant="header" />
         </div>
@@ -243,7 +260,7 @@ export default function CustomerMenu({
       {/* 3. CATEGORIES HORIZONTAL CAROUSEL */}
       <nav aria-label={t('menuCategories')} className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 py-3 px-4 shadow-xs">
         <div className="flex gap-2 overflow-x-auto whitespace-nowrap hide-scrollbar scroll-smooth">
-          {categories.map(cat => {
+          {localizedCategories.map(cat => {
             const isSelected = selectedCategory === cat.id;
             return (
               <button
@@ -338,7 +355,7 @@ export default function CustomerMenu({
         </div>
       )}
 
-      {/* 5. DISHES / ITEMS LIST (PURE DIGITAL SHOWCASE) */}
+      {/* 5. HOT DRINKS / ITEMS LIST */}
       <main className="w-full max-w-5xl mx-auto px-4 mt-4 flex-1">
         {filteredMenu.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -351,7 +368,7 @@ export default function CustomerMenu({
                 {/* Left: Square Thumbnail */}
                 {renderItemThumbnail(item.image, item.name)}
 
-                {/* Middle: Dish Name, Description, Price in ETB */}
+                {/* Middle: Drink name, description, and price in ETB */}
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h3 className="font-extrabold text-sm sm:text-base tracking-tight text-stone-900 leading-snug group-hover:text-emerald-800 transition-colors" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -484,7 +501,7 @@ export default function CustomerMenu({
                 })
               ) : (
                 <div className="text-center py-8 text-stone-400 text-xs">
-                  No bank accounts configured yet.
+                  {t('emptyBanks')}
                 </div>
               )}
 
@@ -522,8 +539,7 @@ export default function CustomerMenu({
                   className="w-10 h-10 rounded-full"
                 />
                 <div>
-                  <h3 className="font-black text-sm leading-none">Abu Coffee</h3>
-                  <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Ethiopia</span>
+                  <h3 className="font-black text-sm leading-none">{restaurantName}</h3>
                 </div>
               </div>
               <button 
@@ -537,14 +553,6 @@ export default function CustomerMenu({
             {/* Drawer Links & Info */}
             <div className="flex-1 py-4 space-y-4 overflow-y-auto">
               <LanguageSelector variant="drawer" />
-
-              <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200">
-                <span className="text-[10px] uppercase font-bold text-stone-400 block mb-1">{t('guestWifi')}</span>
-                <div className="text-xs font-bold text-stone-800">
-                  <p>{t('networkLabel')} <span className="font-mono text-emerald-800">AbuCoffee_Guest</span></p>
-                  <p>{t('passwordLabel')} <span className="font-mono text-emerald-800">buna2026</span></p>
-                </div>
-              </div>
 
               <div className="space-y-1">
                 <button 

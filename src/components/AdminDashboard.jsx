@@ -1,1186 +1,569 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as Icons from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import LanguageSelector from './LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
 
-export default function AdminDashboard({
-  menu,
-  categories,
-  orders,
-  waiterCalls,
-  reviews,
-  theme,
-  restaurantName,
-  tagline,
-  bankAccounts = [],
-  onUpdateMenu,
-  onUpdateOrderStatus,
-  onResolveWaiterCall,
-  onUpdateTheme,
-  onUpdateRestaurantDetails,
-  onUpdateBankAccounts,
-  onToggleAdmin
-}) {
-  const { t, getLocalizedCategory, getLocalizedItem } = useLanguage();
-  const localizedCategories = categories.map(getLocalizedCategory);
-  const localizedMenu = menu.map(getLocalizedItem);
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'banks' | 'menu' | 'tables' | 'analytics' | 'settings'
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
-  
-  // Bank CRUD states
-  const [editingBank, setEditingBank] = useState(null);
-  const [showBankForm, setShowBankForm] = useState(false);
-  const [bankFormName, setBankFormName] = useState('');
-  const [bankFormAccountName, setBankFormAccountName] = useState('');
-  const [bankFormAccountNumber, setBankFormAccountNumber] = useState('');
-  const [bankFormType, setBankFormType] = useState('cbe');
-  const [bankFormColor, setBankFormColor] = useState('#6a1b9a');
+const iconChoices = ['Coffee', 'MugHot', 'CupSoda', 'GlassWater', 'Soup', 'Leaf', 'Flame', 'Star', 'Utensils'];
+const bankTypes = ['cbe', 'awash', 'dashen', 'telebirr', 'other'];
+const themes = [
+  { id: 'forest', color: '#047857' },
+  { id: 'amber', color: '#b45309' },
+  { id: 'midnight', color: '#2f6fba' },
+  { id: 'blossom', color: '#be185d' },
+];
 
-  // Menu CRUD states
-  const [editingItem, setEditingItem] = useState(null);
-  const [showMenuForm, setShowMenuForm] = useState(false);
-  const [formName, setFormName] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formPrice, setFormPrice] = useState(0);
-  const [formCategory, setFormCategory] = useState('starters');
-  const [formImage, setFormImage] = useState('soup');
-  const [formTags, setFormTags] = useState('');
-  const [formIngredients, setFormIngredients] = useState('');
+const makeId = (value) => {
+  const slug = value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return slug || `entry-${Date.now()}`;
+};
 
-  const renderIcon = (name, className = "w-4 h-4") => {
-    const IconComponent = Icons[name] || Icons.HelpCircle;
-    return <IconComponent className={className} />;
-  };
+const renderIcon = (name, className = 'h-4 w-4') => {
+  const Icon = Icons[name] || Icons.HelpCircle;
+  return <Icon className={className} />;
+};
 
-  const handleAddNewItem = () => {
-    setEditingItem(null);
-    setFormName('');
-    setFormDesc('');
-    setFormPrice(10);
-    setFormCategory('starters');
-    setFormImage('soup');
-    setFormTags('Vegetarian');
-    setFormIngredients('Garlic, Herbs');
-    setShowMenuForm(true);
-  };
+const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100';
 
-  const handleEditItem = (item) => {
-    setEditingItem(item);
-    setFormName(item.name);
-    setFormDesc(item.description);
-    setFormPrice(item.price);
-    setFormCategory(item.category);
-    setFormImage(item.image);
-    setFormTags(item.tags.join(', '));
-    setFormIngredients(item.ingredients ? item.ingredients.join(', ') : '');
-    setShowMenuForm(true);
-  };
+function Modal({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="max-h-[94dvh] w-full max-w-2xl overflow-y-auto rounded-t-[2rem] bg-white p-5 shadow-2xl sm:rounded-[2rem] sm:p-7">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h2 className="text-xl font-black tracking-tight text-slate-950">{title}</h2>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900">
+            <Icons.X className="h-5 w-5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
-  const handleSaveItem = (e) => {
-    e.preventDefault();
-    const updatedTags = formTags.split(',').map(t => t.trim()).filter(Boolean);
-    const updatedIngredients = formIngredients.split(',').map(i => i.trim()).filter(Boolean);
-
-    const targetItem = {
-      id: editingItem ? editingItem.id : `custom-${Date.now()}`,
-      name: formName,
-      description: formDesc,
-      price: parseFloat(formPrice) || 0,
-      category: formCategory,
-      image: formImage,
-      tags: updatedTags,
-      rating: editingItem ? editingItem.rating : 5.0,
-      reviews: editingItem ? editingItem.reviews : 1,
-      prepTime: editingItem ? editingItem.prepTime : "15 mins",
-      ingredients: updatedIngredients,
-      customizations: editingItem ? editingItem.customizations : []
-    };
-
-    let newMenu;
-    if (editingItem) {
-      newMenu = menu.map(m => m.id === editingItem.id ? targetItem : m);
-    } else {
-      newMenu = [...menu, targetItem];
-    }
-
-    onUpdateMenu(newMenu);
-    setShowMenuForm(false);
-    setEditingItem(null);
-  };
-
-  const handleDeleteItem = (itemId) => {
-    if (window.confirm(t('deleteItemConfirm'))) {
-      const newMenu = menu.filter(m => m.id !== itemId);
-      onUpdateMenu(newMenu);
+function AppDialog({ t, title, message, tone = 'danger', onConfirm, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const confirm = async () => {
+    setBusy(true);
+    try {
+      await onConfirm?.();
+      onClose();
+    } finally {
+      setBusy(false);
     }
   };
-
-  const bankPresets = [
-    { type: 'cbe', name: 'Commercial Bank of Ethiopia (CBE)', color: '#6a1b9a' },
-    { type: 'telebirr', name: 'Telebirr', color: '#0070ba' },
-    { type: 'abyssinia', name: 'Bank of Abyssinia (BOA)', color: '#d4af37' },
-    { type: 'awash', name: 'Awash Bank', color: '#15803d' },
-    { type: 'dashen', name: 'Dashen Bank', color: '#1e3a8a' },
-    { type: 'other', name: 'Other Bank / Provider', color: '#475569' }
-  ];
-
-  const handleOpenAddBank = () => {
-    setEditingBank(null);
-    setBankFormName('Commercial Bank of Ethiopia (CBE)');
-    setBankFormAccountName('Abu Coffee PLC');
-    setBankFormAccountNumber('');
-    setBankFormType('cbe');
-    setBankFormColor('#6a1b9a');
-    setShowBankForm(true);
-  };
-
-  const handleOpenEditBank = (bank) => {
-    setEditingBank(bank);
-    setBankFormName(bank.bankName);
-    setBankFormAccountName(bank.accountName);
-    setBankFormAccountNumber(bank.accountNumber);
-    setBankFormType(bank.type || 'other');
-    setBankFormColor(bank.color || '#475569');
-    setShowBankForm(true);
-  };
-
-  const handlePresetSelect = (preset) => {
-    setBankFormType(preset.type);
-    if (!editingBank) {
-      setBankFormName(preset.name);
-    }
-    setBankFormColor(preset.color);
-  };
-
-  const handleSaveBank = (e) => {
-    e.preventDefault();
-    const bankItem = {
-      id: editingBank ? editingBank.id : `bank-${Date.now()}`,
-      bankName: bankFormName,
-      accountName: bankFormAccountName,
-      accountNumber: bankFormAccountNumber,
-      type: bankFormType,
-      color: bankFormColor
-    };
-
-    let updatedBanks;
-    if (editingBank) {
-      updatedBanks = bankAccounts.map(b => b.id === editingBank.id ? bankItem : b);
-    } else {
-      updatedBanks = [...bankAccounts, bankItem];
-    }
-
-    if (onUpdateBankAccounts) {
-      onUpdateBankAccounts(updatedBanks);
-    }
-    setShowBankForm(false);
-    setEditingBank(null);
-  };
-
-  const handleDeleteBank = (bankId) => {
-    if (window.confirm(t('deleteBankConfirm'))) {
-      const updated = bankAccounts.filter(b => b.id !== bankId);
-      if (onUpdateBankAccounts) {
-        onUpdateBankAccounts(updated);
-      }
-    }
-  };
-
-  const totalRevenue = orders
-    .filter(o => o.status === 'completed')
-    .reduce((acc, curr) => acc + curr.subtotal, 0);
-
-  const pendingCount = orders.filter(o => o.status === 'pending').length;
-  const preparingCount = orders.filter(o => o.status === 'preparing').length;
-
-  const adminTabs = [
-    { id: 'orders', label: t('liveOrders'), icon: 'Inbox', badge: pendingCount > 0 ? pendingCount : null },
-    { id: 'banks', label: t('bankAccountsTab'), icon: 'Building2' },
-    { id: 'menu', label: t('menuCatalog'), icon: 'UtensilsCrossed' },
-    { id: 'analytics', label: t('salesKpi'), icon: 'BarChart3' },
-    { id: 'settings', label: t('storefrontSetup'), icon: 'Settings' }
-  ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#111319] text-gray-200">
-      
-      {/* Subheader with Hamburger on Mobile */}
-      <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 bg-[#171923] border-b border-[#252836] gap-2">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          {/* Mobile Hamburger Drawer Trigger */}
-          <button 
-            onClick={() => setIsMobileDrawerOpen(true)}
-            className="md:hidden p-2 rounded-xl text-gray-300 hover:bg-[#1f2232] border border-[#2d3142] active:scale-95 transition-all shrink-0"
-            aria-label="Open navigation drawer"
-          >
-            {renderIcon("Menu", "w-5 h-5")}
-          </button>
-
-          <img 
-            src="/abu-coffee-logo.png" 
-            alt="Abu Coffee" 
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-amber-500/40 shadow-sm shrink-0"
-          />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base md:text-lg font-bold text-white leading-tight truncate">
-                {t('adminTitle')}
-              </h2>
-              {/* Active Tab indicator on mobile */}
-              <span className="md:hidden text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
-                {adminTabs.find(t => t.id === activeTab)?.label}
-              </span>
-            </div>
-            <p className="text-[10px] sm:text-xs text-gray-400 truncate hidden sm:block">
-              {t('adminDescription', { restaurant: restaurantName })}
-            </p>
-          </div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone === 'danger' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          {tone === 'danger' ? <Icons.TriangleAlert className="h-5 w-5" /> : <Icons.Info className="h-5 w-5" />}
         </div>
-
-        {/* Right tools / Preparing Counters (Hidden on mobile nav to keep it clean!) */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button 
-            onClick={onToggleAdmin}
-            className="hidden sm:flex text-xs font-bold text-emerald-400 bg-emerald-950/30 px-3 py-1.5 rounded-full border border-emerald-500/20 items-center gap-1.5 hover:bg-emerald-950/60 transition-colors shrink-0"
-          >
-            {renderIcon("ShoppingBag", "w-3 h-3")} {t('viewStorefront')}
-          </button>
-          <LanguageSelector variant="header" theme="dark" className="admin-language-selector shrink-0" />
-          <div className="hidden md:flex bg-[#1f2232] rounded-xl px-2.5 sm:px-3 py-1.5 items-center gap-1.5 sm:gap-2 border border-[#2d3142] shrink-0">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-            <div className="text-left leading-none">
-              <span className="text-[8px] sm:text-[9px] text-gray-400 font-bold block uppercase">{t('preparing')}</span>
-              <span className="text-xs sm:text-sm font-black text-white">{preparingCount}</span>
-            </div>
-          </div>
-          <div className="hidden md:flex bg-[#1f2232] rounded-xl px-2.5 sm:px-3 py-1.5 items-center gap-1.5 sm:gap-2 border border-[#2d3142] shrink-0">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <div className="text-left leading-none">
-              <span className="text-[8px] sm:text-[9px] text-gray-400 font-bold block uppercase">{t('incoming')}</span>
-              <span className="text-xs sm:text-sm font-black text-white">{pendingCount}</span>
-            </div>
-          </div>
+        <h2 className="mt-5 text-lg font-black text-slate-950">{title}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">{t('cancel')}</button>
+          {onConfirm && <button type="button" onClick={confirm} disabled={busy} className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black text-white disabled:opacity-50 ${tone === 'danger' ? 'bg-red-700 hover:bg-red-800' : 'bg-emerald-700 hover:bg-emerald-800'}`}>{busy && <Icons.LoaderCircle className="h-4 w-4 animate-spin" />}{t('confirm')}</button>}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* MOBILE DRAWER NAVIGATION (SLIDE OVER) */}
-      {isMobileDrawerOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[250] md:hidden flex animate-fade-in">
-          <div className="w-72 bg-[#171923] h-full border-r border-[#2d3142] shadow-2xl flex flex-col p-5 text-left animate-slide-right">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-[#252836]">
-              <div className="flex items-center gap-2.5">
-                <img 
-                  src="/abu-coffee-logo.png" 
-                  alt="Abu Coffee" 
-                  className="w-9 h-9 rounded-full object-cover border border-amber-500/40"
-                />
-                <div>
-                  <h3 className="text-sm font-extrabold text-white leading-tight">Abu Coffee</h3>
-                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">{t('adminMenu')}</span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsMobileDrawerOpen(false)}
-                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-[#1f2232]"
-              >
-                {renderIcon("X", "w-5 h-5")}
-              </button>
+function EmptyState({ icon: Icon, children }) {
+  return (
+    <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+      <Icon className="mx-auto h-10 w-10 text-slate-300" />
+      <p className="mx-auto mt-3 max-w-sm text-sm font-semibold leading-6 text-slate-500">{children}</p>
+    </div>
+  );
+}
+
+function FormError({ children }) {
+  if (!children) return null;
+  return <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{children}</p>;
+}
+
+export default function AdminDashboard({
+  menu = [],
+  categories = [],
+  reviews = [],
+  theme = 'forest',
+  mode = 'light',
+  restaurantName = '',
+  tagline = '',
+  bankAccounts = [],
+  adminEmail = '',
+  onSaveMenuItem,
+  onDeleteMenuItem,
+  onSaveCategory,
+  onDeleteCategory,
+  onSaveBankAccount,
+  onDeleteBankAccount,
+  onDeleteReview,
+  onUpdateSettings,
+  onPreviewSettings,
+  onUpdateCredentials,
+  onSignOut,
+}) {
+  const { t, getLocalizedCategory, getLocalizedItem } = useLanguage();
+  const [activeTab, setActiveTab] = useState('menu');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [menuModal, setMenuModal] = useState(null);
+  const [categoryModal, setCategoryModal] = useState(null);
+  const [bankModal, setBankModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [dialog, setDialog] = useState(null);
+
+  const tabs = [
+    { id: 'menu', label: t('menuCatalog'), icon: 'Utensils' },
+    { id: 'categories', label: t('categories'), icon: 'ListTree' },
+    { id: 'banks', label: t('bankAccountsTab'), icon: 'Building2' },
+    { id: 'reviews', label: t('customerReviewsTab'), icon: 'Star' },
+    { id: 'settings', label: t('storefrontSetup'), icon: 'Settings2' },
+  ];
+
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    setMobileNavOpen(false);
+  };
+
+  const submit = async (callback, payload, close) => {
+    setSaving(true);
+    try {
+      await callback(payload);
+      close(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const askConfirm = (config) => setDialog({ ...config, tone: 'danger' });
+  const showNotice = (config) => setDialog({ ...config, tone: 'notice', onConfirm: null });
+
+  return (
+    <div className="admin-shell min-h-screen bg-[#f4f7f6] text-slate-900">
+      <div className="flex min-h-screen">
+        {mobileNavOpen && (
+          <button aria-label={t('closeButton')} onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-30 bg-slate-950/50 lg:hidden" />
+        )}
+
+        <aside className={`fixed inset-y-0 left-0 z-40 flex w-[17rem] flex-col border-r border-white/10 bg-[#111720] px-4 py-5 text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 lg:shadow-none ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="flex items-center gap-3 border-b border-white/10 px-2 pb-5">
+            <img src="/abu-coffee-logo.png" alt="Abu Coffee" className="h-11 w-11 rounded-2xl object-cover" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black">{restaurantName || 'Abu Coffee'}</p>
+              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">{t('adminTitle')}</p>
             </div>
+            <button type="button" onClick={() => setMobileNavOpen(false)} className="ml-auto rounded-lg p-2 text-slate-400 hover:bg-white/10 lg:hidden">
+              <Icons.X className="h-5 w-5" />
+            </button>
+          </div>
 
-            {/* Navigation links in drawer */}
-            <div className="flex-1 py-4 space-y-1.5 overflow-y-auto">
-              {adminTabs.map(tab => {
-                const isSelected = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      setIsMobileDrawerOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
-                      isSelected
-                        ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 shadow-xs'
-                        : 'border border-transparent text-gray-400 hover:text-gray-200 hover:bg-[#1f2232]'
-                    }`}
-                  >
-                    {renderIcon(tab.icon, `w-4 h-4 shrink-0 ${isSelected ? 'stroke-[2.5]' : ''}`)}
-                    <span className="flex-1">{tab.label}</span>
-                    {tab.badge && (
-                      <span className="px-2 py-0.5 text-[10px] bg-red-500 text-white rounded-full font-black leading-none">
-                        {tab.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Drawer Bottom Tools */}
-            <div className="pt-4 border-t border-[#252836] space-y-3">
-              <LanguageSelector variant="drawer" theme="dark" className="admin-language-selector" />
+          <nav className="mt-6 flex-1 space-y-1 overflow-y-auto">
+            <p className="px-3 pb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{t('adminMenu')}</p>
+            {tabs.map((tab) => (
               <button
-                onClick={() => {
-                  setIsMobileDrawerOpen(false);
-                  onToggleAdmin();
-                }}
-                className="w-full py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-950/50 transition-all"
+                key={tab.id}
+                type="button"
+                onClick={() => selectTab(tab.id)}
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold transition ${activeTab === tab.id ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-900/20' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
               >
-                {renderIcon("ShoppingBag", "w-3.5 h-3.5")}
-                <span>{t('viewStorefront')}</span>
+                {renderIcon(tab.icon, 'h-4 w-4')}
+                <span>{tab.label}</span>
               </button>
-            </div>
+            ))}
+          </nav>
+
+          <div className="space-y-2 border-t border-white/10 pt-4">
+            <button type="button" onClick={onSignOut} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-red-200">
+              <Icons.LogOut className="h-4 w-4" />
+              {t('signOut')}
+            </button>
+            <p className="px-3 text-[10px] leading-4 text-slate-500">{t('adminDescription')}</p>
           </div>
-          <div className="flex-1" onClick={() => setIsMobileDrawerOpen(false)} />
-        </div>
-      )}
+        </aside>
 
-      {/* Main SaaS panel */}
-      <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
-        {/* Desktop Sidebar tabs (Clean vertical sidebar; hidden on mobile in favor of Drawer) */}
-        <div className="hidden md:block w-60 bg-[#171923] border-r border-[#252836] py-4 shrink-0">
-          <div className="flex flex-col gap-1.5 px-3">
-            {adminTabs.map(tab => {
-              const isSelected = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap w-full ${
-                    isSelected
-                      ? 'bg-emerald-600/15 border border-emerald-500/30 text-emerald-400 shadow-xs'
-                      : 'border border-transparent text-gray-400 hover:text-gray-200 hover:bg-[#1f2232]'
-                  }`}
-                >
-                  {renderIcon(tab.icon, `w-4 h-4 shrink-0 ${isSelected ? 'stroke-[2.5]' : ''}`)}
-                  <span>{tab.label}</span>
-                  {tab.badge && (
-                    <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-red-500 text-white rounded-full font-black leading-none">
-                      {tab.badge}
-                    </span>
-                  )}
+        <main className="min-w-0 flex-1 lg:ml-[17rem]">
+          <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[#f4f7f6]/95 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-9">
+            <div className="mx-auto flex max-w-[90rem] flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <button type="button" onClick={() => setMobileNavOpen(true)} className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm lg:hidden">
+                  <Icons.Menu className="h-5 w-5" />
                 </button>
-              );
-            })}
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-black tracking-tight text-slate-950 sm:text-xl">{tabs.find((tab) => tab.id === activeTab)?.label}</p>
+                  <p className="hidden truncate text-xs font-semibold text-slate-500 sm:block">{tagline}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <LanguageSelector theme={mode === 'dark' ? 'dark' : 'light'} />
+                <button type="button" onClick={onSignOut} className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:border-red-200 hover:text-red-700 sm:flex">
+                  <Icons.LogOut className="h-3.5 w-3.5" />
+                  {t('signOut')}
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 sm:py-8 lg:px-9">
+            {activeTab === 'menu' && (
+              <MenuTab
+                menu={menu}
+                categories={categories}
+                t={t}
+                getLocalizedCategory={getLocalizedCategory}
+                getLocalizedItem={getLocalizedItem}
+                onAdd={() => setMenuModal({ item: null })}
+                onEdit={(item) => setMenuModal({ item })}
+                onDelete={(id) => askConfirm({ title: t('deleteDrinkTitle'), message: t('deleteItemConfirm'), onConfirm: () => onDeleteMenuItem(id) })}
+              />
+            )}
+            {activeTab === 'categories' && (
+              <CategoriesTab
+                categories={categories}
+                menu={menu}
+                t={t}
+                getLocalizedCategory={getLocalizedCategory}
+                onAdd={() => setCategoryModal({ category: null })}
+                onEdit={(category) => setCategoryModal({ category })}
+                onDelete={(id) => askConfirm({ title: t('deleteCategoryTitle'), message: t('deleteCategoryConfirm'), onConfirm: () => onDeleteCategory(id) })}
+                onBlockedDelete={() => showNotice({ title: t('cannotDeleteCategoryTitle'), message: t('categoryHasItems') })}
+              />
+            )}
+            {activeTab === 'banks' && (
+              <BanksTab
+                banks={bankAccounts}
+                t={t}
+                onAdd={() => setBankModal({ bank: null })}
+                onEdit={(bank) => setBankModal({ bank })}
+                onDelete={(id) => askConfirm({ title: t('deleteBankTitle'), message: t('deleteBankConfirm'), onConfirm: () => onDeleteBankAccount(id) })}
+              />
+            )}
+            {activeTab === 'reviews' && <ReviewsTab reviews={reviews} t={t} onDelete={(id) => askConfirm({ title: t('deleteFeedbackTitle'), message: t('deleteReviewConfirm'), onConfirm: () => onDeleteReview(id) })} />}
+            {activeTab === 'settings' && (
+              <SettingsTab
+                t={t}
+                theme={theme}
+                mode={mode}
+                restaurantName={restaurantName}
+                tagline={tagline}
+                onSave={onUpdateSettings}
+                onPreview={onPreviewSettings}
+                adminEmail={adminEmail}
+                onUpdateCredentials={onUpdateCredentials}
+              />
+            )}
           </div>
-        </div>
-
-        {/* View Space content */}
-        <div className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-6">
-          
-          {/* TAB 1: LIVE ORDERS */}
-          {activeTab === 'orders' && (
-            <div className="flex flex-col gap-6">
-              
-              {/* Waiter calls alerts bar */}
-              {waiterCalls.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <h3 className="text-xs uppercase font-extrabold tracking-wider text-rose-500 flex items-center gap-1">
-                    {renderIcon("BellRing", "w-4 h-4 animate-bounce")} {t('activeWaiterNotifications')} ({waiterCalls.length})
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {waiterCalls.map((call, idx) => (
-                      <div 
-                        key={idx}
-                        className="flex items-center justify-between p-3.5 bg-rose-950/20 border border-rose-900/50 rounded-2xl text-xs text-rose-300 animate-pulse"
-                      >
-                        <div className="text-left leading-tight">
-                          <p className="font-extrabold text-sm text-white">{t('tableNo', { table: call.tableNumber })}</p>
-                          <p className="text-[10px] text-rose-400 font-semibold mt-1">{t('requested', { reason: call.reason, time: call.timestamp })}</p>
-                        </div>
-                        <button
-                          onClick={() => onResolveWaiterCall(idx)}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-[10px]"
-                        >
-                          {t('dismiss')}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Grid lists */}
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                
-                {/* Active and preparing orders */}
-                <div className="xl:col-span-2 flex flex-col gap-4">
-                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-                    {renderIcon("Bell", "w-4 h-4 text-amber-500")}
-                    <span>{t('activeOrdersBoard')}</span>
-                  </h3>
-                  
-                  {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {orders
-                        .filter(o => o.status !== 'completed' && o.status !== 'cancelled')
-                        .map(order => (
-                          <div 
-                            key={order.id} 
-                            className={`p-4 rounded-2xl border bg-[#171923] flex flex-col justify-between gap-4 shadow-md transition-all ${
-                              order.status === 'pending' 
-                                ? 'border-amber-500/30 bg-amber-500/[0.02]' 
-                                : 'border-[#2d3142]'
-                            }`}
-                          >
-                            {/* Card header */}
-                            <div className="flex justify-between items-start">
-                              <div className="text-left">
-                                <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                                  order.orderType === 'delivery' 
-                                    ? 'bg-rose-500 text-white' 
-                                    : 'bg-emerald-500 text-black'
-                                }`}>
-                                  {order.orderType === 'delivery' ? t('deliveryOrder') : t('dineIn')}
-                                </span>
-                                
-                                <p className="text-base font-extrabold text-white mt-2">
-                                  {order.deliveryDetails?.name 
-                                    ? order.deliveryDetails.name 
-                                    : (order.orderType === 'dine-in' ? `Dine-In Order #${order.id.slice(-4)}` : `Delivery #${order.id.slice(-4)}`)
-                                  }
-                                </p>
-                              </div>
-                              <span className="text-[10px] text-gray-400 font-bold">{order.timestamp}</span>
-                            </div>
-
-                            {/* Client Address/Delivery details if type is delivery */}
-                            {order.orderType === 'delivery' && order.deliveryDetails && (
-                              <div className="bg-[#1e202e] p-3 rounded-xl border border-[#2d3142] text-[11px] text-gray-300 text-left space-y-1">
-                                <p className="font-extrabold text-white flex items-center gap-1.5">
-                                  {renderIcon("User", "w-3.5 h-3.5 text-emerald-400")} 
-                                  <span>{order.deliveryDetails.name}</span>
-                                </p>
-                                <p className="flex items-center gap-1.5">
-                                  {renderIcon("Phone", "w-3.5 h-3.5 text-emerald-400")} 
-                                  <span>{order.deliveryDetails.phone}</span>
-                                </p>
-                                <p className="flex items-center gap-1.5 leading-relaxed">
-                                  {renderIcon("MapPin", "w-3.5 h-3.5 text-emerald-400")} 
-                                  <span>{order.deliveryDetails.address}</span>
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Dish Items list */}
-                            <div className="border-t border-b border-[#252836] py-3 text-left">
-                              {order.items.map((item, idx) => (
-                                <div key={idx} className="text-xs py-1 leading-relaxed">
-                                  <div className="flex justify-between font-bold text-gray-200">
-                                    <span>{item.quantity}x {localizedMenu.find(menuItem => menuItem.id === item.id)?.name || item.name}</span>
-                                    <span className="text-gray-400">{item.finalTotalPrice} ETB</span>
-                                  </div>
-                                  {item.selectedCustomizations && (
-                                    <div className="text-[9px] text-gray-500 pl-4">
-                                      {Object.entries(item.selectedCustomizations).map(([k,v]) => {
-                                        if (Array.isArray(v)) {
-                                          if (v.length === 0) return null;
-                                          return <span key={k}>{k}: {v.map(val => val.name).join(', ')} </span>;
-                                        }
-                                        return <span key={k}>{k}: {v} </span>;
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                              
-                              {order.offerApplied && (
-                                <div className="mt-2 text-[9px] font-bold text-emerald-400 bg-emerald-950/20 border border-emerald-900/30 p-1.5 rounded-lg flex items-center gap-1">
-                                  {renderIcon("Sparkles", "w-3 h-3")} {t('comboPromoApplied')}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Total bill */}
-                            <div className="flex justify-between items-center font-bold">
-                              <span className="text-xs text-gray-400">{t('totalBill')}</span>
-                              <span className="text-base font-black text-emerald-400">{order.subtotal} ETB</span>
-                            </div>
-
-                            {/* Action status workflow */}
-                            <div className="flex gap-2 mt-2">
-                              {order.status === 'pending' ? (
-                                <>
-                                  <button
-                                    onClick={() => onUpdateOrderStatus(order.id, 'cancelled')}
-                                    className="flex-1 min-h-[44px] py-2.5 rounded-xl border border-[#2d3142] hover:bg-[#1f2232] text-xs font-bold text-gray-400 active:scale-[0.98] transition-all"
-                                  >
-                                    {t('decline')}
-                                  </button>
-                                  <button
-                                    onClick={() => onUpdateOrderStatus(order.id, 'preparing')}
-                                    className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-amber-500 text-black hover:brightness-110 text-xs font-bold active:scale-[0.98] transition-all"
-                                  >
-                                    {t('accept')}
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={() => onUpdateOrderStatus(order.id, 'completed')}
-                                  className="w-full min-h-[44px] py-2.5 rounded-xl bg-emerald-600 text-white hover:brightness-110 text-xs font-bold active:scale-[0.98] transition-all"
-                                >
-                                  {order.orderType === 'delivery' ? t('shipDelivery') : t('markServed')}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="border border-dashed border-[#2d3142] rounded-3xl py-16 text-center">
-                      {renderIcon("Inbox", "w-10 h-10 text-gray-600 mx-auto stroke-[1.5]")}
-                      <p className="text-sm font-semibold text-gray-400 mt-2">{t('noActiveOrders')}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* History list */}
-                <div className="xl:col-span-1 flex flex-col gap-4">
-                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-                    {renderIcon("History", "w-4 h-4 text-emerald-500")}
-                    <span>{t('completedLogs')}</span>
-                  </h3>
-
-                  <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-1">
-                    {orders.filter(o => o.status === 'completed' || o.status === 'cancelled').length > 0 ? (
-                      orders
-                        .filter(o => o.status === 'completed' || o.status === 'cancelled')
-                        .map(order => (
-                          <div 
-                            key={order.id} 
-                            className="p-4 bg-[#171923]/60 rounded-2xl border border-[#252836]/60 text-left text-xs"
-                          >
-                            <div className="flex justify-between items-center">
-                              <span className="font-extrabold text-gray-200">
-                                {order.deliveryDetails?.name || (order.orderType === 'delivery' ? t('delivery') : `Order #${order.id.slice(-4)}`)}
-                              </span>
-                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
-                                order.status === 'completed' 
-                                  ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/40' 
-                                  : 'bg-rose-950/40 text-rose-400 border border-rose-900/40'
-                              }`}>
-                                {t(`status${order.status.charAt(0).toUpperCase()}${order.status.slice(1)}`)}
-                              </span>
-                            </div>
-                            <div className="text-gray-400 mt-2">
-                              {order.items.map((i, idx) => (
-                                <p key={idx}>{i.quantity}x {localizedMenu.find(menuItem => menuItem.id === i.id)?.name || i.name}</p>
-                              ))}
-                            </div>
-                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-[#252836]/40 font-bold">
-                              <span className="text-gray-500">{t('subtotal')}</span>
-                              <span className="text-emerald-400">{order.subtotal} ETB</span>
-                            </div>
-                          </div>
-                        ))
-                    ) : (
-                      <p className="text-xs text-gray-500 text-center py-6">{t('noOrderLogs')}</p>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* TAB: BANK ACCOUNTS (MULTI-BANK MANAGEMENT) */}
-          {activeTab === 'banks' && (
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-[#171923] border border-[#252836] rounded-2xl">
-                <div>
-                  <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
-                    {renderIcon("Building2", "w-5 h-5 text-amber-400")}
-                    <span>{t('bankAccountsHeading')}</span>
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {t('bankAccountsSubheading')}
-                  </p>
-                </div>
-                <button
-                  onClick={handleOpenAddBank}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-emerald-900/30 shrink-0"
-                >
-                  {renderIcon("Plus", "w-4 h-4")}
-                  <span>{t('addBankAccount')}</span>
-                </button>
-              </div>
-
-              {/* Grid of Bank Accounts */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {bankAccounts && bankAccounts.length > 0 ? (
-                  bankAccounts.map(bank => (
-                    <div
-                      key={bank.id}
-                      className="p-4 rounded-2xl bg-[#171923] border border-[#252836] hover:border-amber-500/40 transition-all flex flex-col justify-between shadow-xs relative group"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span 
-                              className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
-                              style={{ backgroundColor: bank.color || '#d97706' }}
-                            />
-                            <h3 className="font-extrabold text-sm text-white">{bank.bankName}</h3>
-                          </div>
-                          <span className="text-[10px] uppercase font-bold text-gray-400 bg-[#1e212f] px-2 py-0.5 rounded-md border border-[#2d3142]">
-                            {bank.type || 'bank'}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 space-y-2 text-xs">
-                          <div className="text-gray-400">
-                            <span className="text-[10px] uppercase font-bold text-gray-500 block">{t('accountHolder')}</span>
-                            <span className="font-semibold text-gray-200">{bank.accountName}</span>
-                          </div>
-                          <div className="pt-1">
-                            <span className="text-[10px] uppercase font-bold text-gray-500 block mb-1">{t('accountNumber')}</span>
-                            <div className="bg-[#1e212f] p-2.5 rounded-xl border border-[#2d3142] flex items-center justify-between">
-                              <span className="font-mono text-sm font-black text-amber-400 tracking-wider">
-                                {bank.accountNumber}
-                              </span>
-                              <span className="text-[9px] text-gray-500 font-semibold uppercase">{t('copyAccount')}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Actions */}
-                      <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-[#252836]">
-                        <button
-                          onClick={() => handleOpenEditBank(bank)}
-                          className="p-2 rounded-xl bg-[#1e212f] text-gray-300 hover:text-white hover:bg-[#252836] transition-colors"
-                          title={t('editBank')}
-                        >
-                          {renderIcon("Pencil", "w-4 h-4")}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBank(bank.id)}
-                          className="p-2 rounded-xl bg-red-950/30 text-red-400 hover:bg-red-950/60 border border-red-900/40 transition-colors"
-                          title="Delete Bank"
-                        >
-                          {renderIcon("Trash2", "w-4 h-4")}
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="col-span-full border border-dashed border-[#2d3142] rounded-3xl py-12 text-center text-gray-400">
-                    <p className="text-sm font-bold">No bank accounts added yet.</p>
-                    <p className="text-xs text-gray-500 mt-1">Add your CBE, Telebirr, or other accounts for customer transfers.</p>
-                    <button
-                      onClick={handleOpenAddBank}
-                      className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2"
-                    >
-                      {renderIcon("Plus", "w-4 h-4")}
-                      <span>{t('addBankAccount')}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: MENU EDITOR */}
-          {activeTab === 'menu' && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="text-left">
-                  <h3 className="text-lg font-bold text-white leading-none">{t('menuCatalogEditor')}</h3>
-                  <p className="text-xs text-gray-400 mt-1">{t('menuCatalogDescription')}</p>
-                </div>
-                <button
-                  onClick={handleAddNewItem}
-                  className="self-start sm:self-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
-                >
-                  {renderIcon("Plus", "w-4 h-4")} {t('addDish')}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-                {menu.map(item => {
-                  const itemCategory = localizedCategories.find(c => c.id === item.category)?.name || item.category;
-                  const localizedItem = localizedMenu.find(m => m.id === item.id) || item;
-                  return (
-                    <div 
-                      key={item.id}
-                      className="p-4 bg-[#171923] border border-[#252836] rounded-2xl flex flex-col justify-between gap-4"
-                    >
-                      <div className="text-left">
-                        <div className="flex justify-between items-start">
-                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-500 bg-amber-950/20 px-2.5 py-0.5 rounded-full border border-amber-900/30">
-                            {itemCategory}
-                          </span>
-                          <span className="text-base font-black text-emerald-400">
-                            {item.price} ETB
-                          </span>
-                        </div>
-                        <h4 className="font-extrabold text-white text-sm mt-3.5">{localizedItem.name}</h4>
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed">{localizedItem.description}</p>
-                        
-                        {localizedItem.tags && localizedItem.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-3">
-                            {localizedItem.tags.map(tag => (
-                              <span key={tag} className="text-[9px] font-bold px-2 py-0.5 bg-[#1f2232] text-gray-300 rounded border border-[#2d3142]">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 pt-3 border-t border-[#252836]">
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="p-2 rounded-xl border border-[#2d3142] text-rose-500 hover:bg-rose-950/20 hover:border-rose-900/50 flex items-center justify-center shrink-0"
-                        >
-                          {renderIcon("Trash2", "w-4.5 h-4.5")}
-                        </button>
-                        <button
-                          onClick={() => handleEditItem(item)}
-                          className="flex-1 py-2 bg-[#1f2232] hover:bg-[#282c3f] rounded-xl text-xs font-bold text-gray-200 border border-[#2d3142]"
-                        >
-                          {t('editRecipe')}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TAB: ANALYTICS */}
-          {activeTab === 'analytics' && (
-            <div className="flex flex-col gap-6 text-left">
-              <div>
-                <h3 className="text-lg font-bold text-white leading-none">Analytics Performance KPIs</h3>
-                <p className="text-xs text-gray-400 mt-1">Visual reports on sales, order quantities, and ratings.</p>
-              </div>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <div className="p-3.5 sm:p-4 bg-[#171923] border border-[#252836] rounded-2xl">
-                  <div className="flex justify-between items-start text-gray-400">
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">{t('completedSales')}</span>
-                    {renderIcon("TrendingUp", "w-4 h-4 text-emerald-500")}
-                  </div>
-                  <h4 className="text-lg sm:text-2xl font-black text-white mt-1.5 sm:mt-2 truncate">{totalRevenue.toLocaleString()} ETB</h4>
-                </div>
-
-                <div className="p-3.5 sm:p-4 bg-[#171923] border border-[#252836] rounded-2xl">
-                  <div className="flex justify-between items-start text-gray-400">
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">{t('totalCheckouts')}</span>
-                    {renderIcon("ClipboardList", "w-4 h-4 text-amber-500")}
-                  </div>
-                  <h4 className="text-lg sm:text-2xl font-black text-white mt-1.5 sm:mt-2">{orders.length}</h4>
-                </div>
-
-                <div className="p-3.5 sm:p-4 bg-[#171923] border border-[#252836] rounded-2xl">
-                  <div className="flex justify-between items-start text-gray-400">
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">{t('averageBill')}</span>
-                    {renderIcon("CreditCard", "w-4 h-4 text-blue-500")}
-                  </div>
-                  <h4 className="text-lg sm:text-2xl font-black text-white mt-1.5 sm:mt-2 truncate">
-                    {orders.length > 0 ? (totalRevenue / orders.length).toFixed(0) : "0"} ETB
-                  </h4>
-                </div>
-
-                <div className="p-3.5 sm:p-4 bg-[#171923] border border-[#252836] rounded-2xl">
-                  <div className="flex justify-between items-start text-gray-400">
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">{t('customerRating')}</span>
-                    {renderIcon("Star", "w-4 h-4 text-yellow-500")}
-                  </div>
-                  <h4 className="text-lg sm:text-2xl font-black text-white mt-1.5 sm:mt-2">
-                    {reviews.length > 0 ? (reviews.reduce((a,b)=>a+b.rating,0)/reviews.length).toFixed(1) : "4.9"}
-                  </h4>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 p-4 sm:p-5 bg-[#171923] border border-[#252836] rounded-2xl">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-gray-400 mb-4">{t('hourlyRevenue')}</h4>
-                  
-                  <div className="overflow-x-auto no-scrollbar pb-1">
-                    <div className="h-44 min-w-[320px] w-full flex items-end justify-between relative pt-6 border-b border-l border-[#2d3142] px-2.5 pb-2">
-                      <div className="absolute inset-0 border-t border-[#1f2232] top-1/4 pointer-events-none"></div>
-                      <div className="absolute inset-0 border-t border-[#1f2232] top-2/4 pointer-events-none"></div>
-                      <div className="absolute inset-0 border-t border-[#1f2232] top-3/4 pointer-events-none"></div>
-
-                      {[
-                        { hr: "12 PM", val: 40 },
-                        { hr: "2 PM", val: 85 },
-                        { hr: "4 PM", val: 30 },
-                        { hr: "6 PM", val: 120 },
-                        { hr: "8 PM", val: 180 },
-                        { hr: "10 PM", val: 95 }
-                      ].map((pt, i) => (
-                        <div key={i} className="flex flex-col items-center gap-1.5 z-10 w-10 sm:w-12">
-                          <div 
-                            className="w-4 sm:w-5 bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-md hover:brightness-110 transition-all duration-300"
-                            style={{ height: `${(pt.val / 200) * 120}px` }}
-                          ></div>
-                          <span className="text-[9px] text-gray-500 font-bold">{pt.hr}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="lg:col-span-1 p-5 bg-[#171923] border border-[#252836] rounded-2xl flex flex-col gap-4">
-                  <h4 className="text-xs uppercase font-extrabold tracking-wider text-gray-400">Client Reviews ({reviews.length})</h4>
-                  
-                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[220px] pr-1">
-                    {reviews.length > 0 ? (
-                      reviews.map((rev, idx) => (
-                        <div key={idx} className="p-3 bg-[#1e212f] rounded-xl border border-[#2b3042] text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-white">
-                              {rev.tableNumber && !rev.tableNumber.toLowerCase().includes('table') ? rev.tableNumber : 'Customer Review'}
-                            </span>
-                            <div className="flex gap-0.5">
-                              {[1, 2, 3, 4, 5].map(st => (
-                                <Icons.Star 
-                                  key={st}
-                                  className={`w-3 h-3 ${st <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-600'}`}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          {rev.comment && (
-                            <p className="text-[10px] text-gray-400 mt-1.5 italic">"{rev.comment}"</p>
-                          )}
-                          <span className="text-[8px] text-gray-500 block mt-2">{rev.timestamp}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-gray-500 text-center py-6">No customer feedback yet.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: SETTINGS */}
-          {activeTab === 'settings' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-              <div className="p-5 bg-[#171923] border border-[#252836] rounded-2xl flex flex-col gap-4">
-                <div>
-                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">Restaurant Profile Details</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Configure global display names for the client application storefront.</p>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Restaurant Name</label>
-                    <input
-                      type="text"
-                      value={restaurantName}
-                      onChange={(e) => onUpdateRestaurantDetails(e.target.value, tagline)}
-                      className="w-full bg-[#1e212f] border border-[#2d3142] rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Slogan / Tagline</label>
-                    <input
-                      type="text"
-                      value={tagline}
-                      onChange={(e) => onUpdateRestaurantDetails(restaurantName, e.target.value)}
-                      className="w-full bg-[#1e212f] border border-[#2d3142] rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 bg-[#171923] border border-[#252836] rounded-2xl flex flex-col gap-4">
-                <div>
-                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">Store Palette Branding</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Swap colors across customer layout and print outputs.</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  {[
-                    { id: 'forest', name: 'Forest Bistro', desc: 'Emerald & Gold', class: 'border-emerald-600 bg-emerald-950/20 text-emerald-300' },
-                    { id: 'amber', name: 'Amber Cafe', desc: 'Yellow & Teal', class: 'border-amber-500 bg-amber-950/20 text-amber-300' },
-                    { id: 'midnight', name: 'Midnight Grill', desc: 'Crimson & Gold', class: 'border-rose-600 bg-rose-950/20 text-rose-300' },
-                    { id: 'blossom', name: 'Blossom Cafe', desc: 'Pink & Sage', class: 'border-pink-600 bg-pink-950/20 text-pink-300' },
-                  ].map(t => {
-                    const isSelected = theme === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => onUpdateTheme(t.id)}
-                        className={`p-3 rounded-2xl border text-left flex flex-col justify-between h-20 transition-all ${
-                          isSelected
-                            ? `${t.class} shadow-md`
-                            : 'border-[#2d3142] bg-[#1e212f] text-gray-400 hover:border-gray-600'
-                        }`}
-                      >
-                        <span className="font-extrabold text-xs text-white">{t.name}</span>
-                        <span className="text-[9px] font-semibold opacity-80">{t.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Storefront Menu QR Stand Card */}
-              <div className="p-5 bg-[#171923] border border-[#252836] rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-5 text-left">
-                <div className="flex-1">
-                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-                    {renderIcon("QrCode", "w-4 h-4 text-emerald-400")}
-                    <span>Digital Menu QR Code</span>
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                    Customers can scan this QR code with their phone cameras to instantly access your digital showcase menu, prices in ETB, and bank account transfer numbers.
-                  </p>
-                  <div className="mt-3.5 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => window.print()}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow"
-                    >
-                      {renderIcon("Printer", "w-3.5 h-3.5")}
-                      <span>Print QR Stand</span>
-                    </button>
-                    <button
-                      onClick={onToggleAdmin}
-                      className="px-4 py-2 bg-[#1e212f] hover:bg-[#252836] text-gray-300 border border-[#2d3142] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
-                    >
-                      {renderIcon("ExternalLink", "w-3.5 h-3.5")}
-                      <span>Open Customer Menu</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-3.5 bg-white rounded-2xl border border-stone-200 shadow-md flex flex-col items-center shrink-0">
-                  <QRCodeSVG
-                    value={typeof window !== 'undefined' ? window.location.origin : 'https://abu-coffee.et'}
-                    size={135}
-                    level="H"
-                    includeMargin={true}
-                  />
-                  <span className="text-[10px] font-black text-stone-900 mt-1">Abu Coffee Menu</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-        </div>
+        </main>
       </div>
 
-      {/* CRUD Form Modal */}
-      {showMenuForm && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[300] flex items-center justify-center p-4">
-          <div className="bg-[#171923] border border-[#2d3142] rounded-3xl p-4 sm:p-6 w-full max-w-lg max-h-[calc(100dvh-2rem)] shadow-2xl text-left text-gray-200">
-            <h3 className="text-base font-extrabold tracking-tight text-white mb-4">
-              {editingItem ? "Edit Catalog Item" : "Create Catalog Recipe"}
-            </h3>
-
-            <form onSubmit={handleSaveItem} className="flex flex-col gap-3 max-h-[calc(100dvh-7rem)] overflow-y-auto pr-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-400">Dish Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-400">{t('basePrice')}</label>
-                  <input
-                    type="number"
-                    step="1"
-                    required
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(e.target.value)}
-                    className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400">Description</label>
-                <textarea
-                  required
-                  rows={2}
-                  value={formDesc}
-                  onChange={(e) => setFormDesc(e.target.value)}
-                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-medium focus:outline-none"
-                ></textarea>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-400">Category</label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none"
-                  >
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-400">Thumbnail Graphic</label>
-                  <select
-                    value={formImage}
-                    onChange={(e) => setFormImage(e.target.value)}
-                    className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none"
-                  >
-                    <option value="soup">Soup Graphic</option>
-                    <option value="coffee">Coffee/Espresso Graphic</option>
-                    <option value="mocktail">Mocktail Graphic</option>
-                    <option value="tiramisu">Cake/Dessert Graphic</option>
-                    <option value="salad">Salad Graphic</option>
-                    <option value="steak">Flame/Meat Graphic</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-400">Dietary Labels (comma-separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Vegan, Spicy, Gluten-Free"
-                    value={formTags}
-                    onChange={(e) => setFormTags(e.target.value)}
-                    className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-400">Ingredients (comma-separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Potato, Olive, Oregano"
-                    value={formIngredients}
-                    onChange={(e) => setFormIngredients(e.target.value)}
-                    className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2.5 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowMenuForm(false)}
-                  className="flex-1 py-2.5 text-xs font-bold rounded-xl border border-[#2d3142] text-gray-400 hover:bg-[#1f2232]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:brightness-110"
-                >
-                  Save Recipe
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {menuModal && (
+        <MenuModal
+          item={menuModal.item}
+          categories={categories}
+          t={t}
+          saving={saving}
+          onClose={() => setMenuModal(null)}
+          onSave={(item) => submit(onSaveMenuItem, item, setMenuModal)}
+        />
       )}
-      {/* Bank Account Add/Edit Modal */}
-      {showBankForm && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[300] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#171923] border border-[#2d3142] rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl text-left text-gray-200">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#252836]">
-              <h3 className="text-base font-extrabold tracking-tight text-white flex items-center gap-2">
-                {renderIcon("Building2", "w-5 h-5 text-amber-400")}
-                <span>{editingBank ? t('editBank') : t('addBankAccount')}</span>
-              </h3>
-              <button 
-                onClick={() => setShowBankForm(false)}
-                className="p-1 text-gray-400 hover:text-white rounded-lg"
-              >
-                {renderIcon("X", "w-5 h-5")}
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveBank} className="flex flex-col gap-3.5">
-              {/* Preset Selector */}
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1.5">{t('bankType')}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {bankPresets.map(preset => (
-                    <button
-                      key={preset.type}
-                      type="button"
-                      onClick={() => handlePresetSelect(preset)}
-                      className={`p-2 rounded-xl text-center border text-xs font-bold transition-all ${
-                        bankFormType === preset.type
-                          ? 'border-emerald-500 bg-emerald-950/30 text-emerald-400'
-                          : 'border-[#2d3142] bg-[#1e212f] text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      <span className="w-2 h-2 rounded-full inline-block mr-1.5" style={{ backgroundColor: preset.color }} />
-                      <span className="capitalize">{preset.type}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400">{t('bankName')}</label>
-                <input
-                  type="text"
-                  required
-                  value={bankFormName}
-                  onChange={(e) => setBankFormName(e.target.value)}
-                  placeholder="e.g. Commercial Bank of Ethiopia"
-                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400">{t('accountHolder')}</label>
-                <input
-                  type="text"
-                  required
-                  value={bankFormAccountName}
-                  onChange={(e) => setBankFormAccountName(e.target.value)}
-                  placeholder="e.g. Abu Coffee PLC"
-                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-semibold focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400">{t('accountNumber')}</label>
-                <input
-                  type="text"
-                  required
-                  value={bankFormAccountNumber}
-                  onChange={(e) => setBankFormAccountNumber(e.target.value)}
-                  placeholder="e.g. 1000284918234 or 0911234567"
-                  className="w-full mt-1 bg-[#1e212f] border border-[#2d3142] rounded-xl p-2.5 text-xs text-white font-mono font-bold tracking-wider focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="flex gap-2.5 mt-3 pt-3 border-t border-[#252836]">
-                <button
-                  type="button"
-                  onClick={() => setShowBankForm(false)}
-                  className="flex-1 py-2.5 text-xs font-bold rounded-xl border border-[#2d3142] text-gray-400 hover:bg-[#1f2232]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40"
-                >
-                  {t('saveBank')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {dialog && <AppDialog t={t} {...dialog} onClose={() => setDialog(null)} />}
+      {categoryModal && (
+        <CategoryModal
+          category={categoryModal.category}
+          t={t}
+          saving={saving}
+          onClose={() => setCategoryModal(null)}
+          onSave={(category) => submit(onSaveCategory, category, setCategoryModal)}
+        />
+      )}
+      {bankModal && (
+        <BankModal
+          bank={bankModal.bank}
+          t={t}
+          saving={saving}
+          onClose={() => setBankModal(null)}
+          onSave={(bank) => submit(onSaveBankAccount, bank, setBankModal)}
+        />
       )}
     </div>
   );
+}
+
+function PageHeading({ eyebrow, title, description, action }) {
+  return (
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">{eyebrow}</p>
+        <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{description}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function MenuTab({ menu, categories, t, getLocalizedCategory, getLocalizedItem, onAdd, onEdit, onDelete }) {
+  const categoryNames = useMemo(() => Object.fromEntries(categories.map((category) => [category.id, getLocalizedCategory(category).name])), [categories, getLocalizedCategory]);
+  return (
+    <>
+      <PageHeading
+        eyebrow={t('menuCatalogEditor')}
+        title={t('menuCatalog')}
+        description={t('menuCatalogDescription')}
+        action={<button type="button" onClick={onAdd} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"><Icons.Plus className="h-4 w-4" />{t('addDrink')}</button>}
+      />
+      {menu.length === 0 ? <EmptyState icon={Icons.Utensils}>{t('emptyMenu')}</EmptyState> : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {menu.map((rawItem) => {
+            const item = getLocalizedItem(rawItem);
+            return (
+              <article key={item.id} className="flex min-w-0 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row">
+                <div className="h-28 w-full shrink-0 overflow-hidden rounded-2xl bg-emerald-50 sm:w-28">
+                  {item.image?.startsWith('http') || item.image?.startsWith('data:image/') ? <img src={item.image} alt={item.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-emerald-700">{renderIcon('Coffee', 'h-8 w-8')}</div>}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-base font-black text-slate-950">{item.name}</h2>
+                      <p className="mt-1 text-xs font-bold text-emerald-700">{categoryNames[item.category] || item.category}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-800">{item.price} ETB</span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-500">{item.description || t('noDescription')}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => onEdit(rawItem)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"><Icons.Pencil className="h-3.5 w-3.5" />{t('edit')}</button>
+                    <button type="button" onClick={() => onDelete(item.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-100 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-50"><Icons.Trash2 className="h-3.5 w-3.5" />{t('delete')}</button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function CategoriesTab({ categories, menu, t, getLocalizedCategory, onAdd, onEdit, onDelete, onBlockedDelete }) {
+  return (
+    <>
+      <PageHeading
+        eyebrow={t('categoryManager')}
+        title={t('categories')}
+        description={t('categoryDescription')}
+        action={<button type="button" onClick={onAdd} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"><Icons.Plus className="h-4 w-4" />{t('addCategory')}</button>}
+      />
+      {categories.length === 0 ? <EmptyState icon={Icons.ListTree}>{t('emptyCategories')}</EmptyState> : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {categories.map((category) => {
+            const localized = getLocalizedCategory(category);
+            const itemCount = menu.filter((item) => item.category === category.id).length;
+            return (
+              <article key={category.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">{renderIcon(category.icon)}</div>
+                    <div className="min-w-0"><h2 className="truncate font-black text-slate-950">{localized.name}</h2><p className="mt-1 text-xs font-semibold text-slate-400">{itemCount} {t('menuItemsLabel')}</p></div>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">#{category.sortOrder}</span>
+                </div>
+                <div className="mt-5 flex gap-2">
+                  <button type="button" onClick={() => onEdit(category)} className="flex-1 rounded-xl border border-slate-200 py-2 text-xs font-black text-slate-700 hover:border-emerald-300 hover:text-emerald-700">{t('edit')}</button>
+                  <button type="button" onClick={() => {
+                    if (itemCount > 0) return onBlockedDelete();
+                    onDelete(category.id);
+                  }} className="rounded-xl border border-red-100 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-50"><Icons.Trash2 className="h-4 w-4" /></button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function BanksTab({ banks, t, onAdd, onEdit, onDelete }) {
+  return (
+    <>
+      <PageHeading
+        eyebrow={t('bankAccountsHeading')}
+        title={t('bankAccountsTab')}
+        description={t('bankAccountsSubheading')}
+        action={<button type="button" onClick={onAdd} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"><Icons.Plus className="h-4 w-4" />{t('addBankAccount')}</button>}
+      />
+      {banks.length === 0 ? <EmptyState icon={Icons.Building2}>{t('emptyBanks')}</EmptyState> : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {banks.map((bank) => (
+            <article key={bank.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: bank.color }} /><h2 className="font-black text-slate-950">{bank.bankName}</h2></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase text-slate-500">{bank.type}</span></div>
+              <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400">{t('accountHolder')}</p><p className="mt-1 font-bold text-slate-800">{bank.accountName}</p>
+              <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400">{t('accountNumber')}</p><p className="mt-1 break-all font-mono text-base font-black text-slate-900">{bank.accountNumber}</p>
+              <div className="mt-5 flex gap-2"><button type="button" onClick={() => onEdit(bank)} className="flex-1 rounded-xl border border-slate-200 py-2 text-xs font-black text-slate-700 hover:border-emerald-300 hover:text-emerald-700">{t('edit')}</button><button type="button" onClick={() => onDelete(bank.id)} className="rounded-xl border border-red-100 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-50"><Icons.Trash2 className="h-4 w-4" /></button></div>
+            </article>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReviewsTab({ reviews, t, onDelete }) {
+  return (
+    <>
+      <PageHeading eyebrow={t('customerReviewsHeading')} title={t('customerReviewsTab')} description={t('customerReviewsDescription')} />
+      {reviews.length === 0 ? <EmptyState icon={Icons.Star}>{t('emptyReviews')}</EmptyState> : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {reviews.map((review) => <article key={review.id || `${review.timestamp}-${review.comment}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><span className="text-xs font-black uppercase tracking-wider text-emerald-700">{review.tableNumber}</span><span className="text-xs font-bold text-slate-400">{review.timestamp}</span></div><div className="mt-3 flex gap-1">{[1, 2, 3, 4, 5].map((star) => <Icons.Star key={star} className={`h-4 w-4 ${review.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />)}</div><p className="mt-4 text-sm leading-6 text-slate-600">{review.comment || t('noComment')}</p><button type="button" onClick={() => onDelete?.(review.id)} className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-red-100 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-50"><Icons.Trash2 className="h-3.5 w-3.5" />{t('deleteFeedback')}</button></article>)}
+        </div>
+      )}
+    </>
+  );
+}
+
+function handleImageUpload(event, setForm) {
+  const file = event.target.files?.[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = () => setForm((current) => ({ ...current, image: String(reader.result) }));
+  reader.readAsDataURL(file);
+}
+
+function SettingsTab({ t, theme, mode, restaurantName, tagline, onSave, onPreview, adminEmail, onUpdateCredentials }) {
+  const [form, setForm] = useState({ restaurantName, tagline, theme, mode });
+  const [saving, setSaving] = useState(false);
+  const [credentials, setCredentials] = useState({ email: '', password: '', confirmPassword: '' });
+  const [credentialsSaving, setCredentialsSaving] = useState(false);
+  const [credentialsMessage, setCredentialsMessage] = useState('');
+  const [credentialsError, setCredentialsError] = useState('');
+  const [profileError, setProfileError] = useState('');
+  useEffect(() => setForm({ restaurantName, tagline, theme, mode }), [restaurantName, tagline, theme, mode]);
+  const url = 'https://abu-coffee.vercel.app/';
+  const changeAppearance = (changes) => {
+    const next = { ...form, ...changes };
+    setForm(next);
+    onPreview?.(next);
+  };
+  const save = async (event) => {
+    event.preventDefault();
+    if (!form.restaurantName.trim() || !form.tagline.trim()) {
+      setProfileError(t('formErrorSummary'));
+      return;
+    }
+    setProfileError('');
+    setSaving(true);
+    try { await onSave(form); } finally { setSaving(false); }
+  };
+  const saveCredentials = async (event) => {
+    event.preventDefault();
+    setCredentialsError('');
+    setCredentialsMessage('');
+    if (credentials.password && credentials.password !== credentials.confirmPassword) {
+      setCredentialsError(t('passwordsDoNotMatch'));
+      return;
+    }
+    if (credentials.password && credentials.password.length < 8) {
+      setCredentialsError(t('passwordTooShort'));
+      return;
+    }
+    setCredentialsSaving(true);
+    try {
+      await onUpdateCredentials({ email: credentials.email, password: credentials.password });
+      setCredentials({ email: '', password: '', confirmPassword: '' });
+      setCredentialsMessage(t('credentialsUpdated'));
+    } catch (credentialError) {
+      setCredentialsError(credentialError.message || t('credentialsUpdateFailed'));
+    } finally {
+      setCredentialsSaving(false);
+    }
+  };
+  return (
+    <>
+      <PageHeading eyebrow={t('storefrontSetup')} title={t('storefrontSetup')} description={t('profileDescription')} />
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="space-y-5">
+        <form noValidate onSubmit={save} className="settings-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <h2 className="text-lg font-black text-slate-950">{t('profileDetails')}</h2>
+          <FormError>{profileError}</FormError>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="sm:col-span-2"><span className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-500">{t('restaurantName')}</span><input className={inputClass} value={form.restaurantName} onChange={(e) => setForm({ ...form, restaurantName: e.target.value })} /></label>
+            <label className="sm:col-span-2"><span className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-500">{t('slogan')}</span><textarea className={`${inputClass} min-h-24 resize-y`} value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} /></label>
+          </div>
+          <div className="mt-6"><span className="mb-3 block text-xs font-black uppercase tracking-wider text-slate-500">{t('theme')}</span><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{themes.map((option) => <button key={option.id} type="button" onClick={() => changeAppearance({ theme: option.id })} className={`settings-theme-option rounded-2xl border p-3 text-left transition ${form.theme === option.id ? 'settings-theme-option-selected border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-slate-300'}`}><span className="mb-3 block h-7 rounded-xl" style={{ backgroundColor: option.color }} /><span className="settings-theme-label text-xs font-black capitalize text-slate-700">{t(`theme${option.id[0].toUpperCase()}${option.id.slice(1)}`)}</span></button>)}</div></div>
+          <div className="mt-6"><span className="mb-3 block text-xs font-black uppercase tracking-wider text-slate-500">{t('appearanceMode')}</span><div className="grid grid-cols-2 gap-3">{['light', 'dark'].map((option) => <button key={option} type="button" onClick={() => changeAppearance({ mode: option })} className={`settings-theme-option flex items-center gap-3 rounded-2xl border p-3 text-left transition ${form.mode === option ? 'settings-theme-option-selected border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-slate-300'}`}>{option === 'dark' ? <Icons.Moon className="h-5 w-5 text-slate-700" /> : <Icons.Sun className="h-5 w-5 text-amber-500" />}<span className="settings-theme-label text-xs font-black text-slate-700">{t(option === 'dark' ? 'darkMode' : 'lightMode')}</span></button>)}</div></div>
+          <button type="submit" disabled={saving} className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 disabled:opacity-50">{saving && <Icons.LoaderCircle className="h-4 w-4 animate-spin" />}{t('saveChanges')}</button>
+        </form>
+        <form onSubmit={saveCredentials} className="settings-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <h2 className="text-lg font-black text-slate-950">{t('accountSecurity')}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">{t('accountSecurityDescription')}</p>
+          <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{t('currentAdminEmail')}: {adminEmail || t('notAvailable')}</p>
+          <div className="mt-5 space-y-4">
+            <label><span className="field-label">{t('newAdminEmail')}</span><input type="email" autoComplete="email" className={inputClass} value={credentials.email} onChange={(e) => setCredentials({ ...credentials, email: e.target.value })} placeholder={adminEmail} /></label>
+            <label><span className="field-label">{t('newAdminPassword')}</span><input type="password" autoComplete="new-password" minLength="8" className={inputClass} value={credentials.password} onChange={(e) => setCredentials({ ...credentials, password: e.target.value })} /></label>
+            <label><span className="field-label">{t('confirmAdminPassword')}</span><input type="password" autoComplete="new-password" minLength="8" className={inputClass} value={credentials.confirmPassword} onChange={(e) => setCredentials({ ...credentials, confirmPassword: e.target.value })} /></label>
+          </div>
+          {credentialsError && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{credentialsError}</p>}
+          {credentialsMessage && <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{credentialsMessage}</p>}
+          <button type="submit" disabled={credentialsSaving || (!credentials.email.trim() && !credentials.password)} className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-800 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{credentialsSaving && <Icons.LoaderCircle className="h-4 w-4 animate-spin" />}{t('updateCredentials')}</button>
+        </form>
+        </div>
+        <div className="settings-card rounded-3xl border border-slate-200 bg-white p-5 text-center shadow-sm sm:p-7"><h2 className="text-lg font-black text-slate-950">{t('qrCodeTitle')}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{t('qrCodeDescription')}</p><div className="mx-auto mt-6 flex w-fit rounded-3xl border border-slate-100 bg-white p-4 shadow-inner"><QRCodeSVG value={url} size={170} level="H" includeMargin imageSettings={{ src: '/abu-coffee-logo.png', height: 34, width: 34, excavate: true }} /></div><p className="mt-4 break-all text-xs font-bold text-slate-400">{url}</p></div>
+      </div>
+    </>
+  );
+}
+
+function MenuModal({ item, categories, t, saving, onClose, onSave }) {
+  const [form, setForm] = useState(() => ({
+    id: item?.id || '', name: item?.name || '', description: item?.description || '', price: item?.price || '', category: item?.category || categories[0]?.id || '', image: item?.image || '', tags: item?.tags?.join(', ') || '', ingredients: item?.ingredients?.join(', ') || '', prepTime: item?.prepTime || '', rating: item?.rating || 0, reviews: item?.reviews || 0, customizations: item?.customizations || [], translations: item?.translations || {},
+  }));
+  const [formError, setFormError] = useState('');
+  const [useTemplate, setUseTemplate] = useState(false);
+  const descriptionTemplate = t('descriptionTemplateText');
+  const submitForm = (event) => {
+    event.preventDefault();
+    if (!form.name.trim() || !form.category || Number(form.price) <= 0) {
+      setFormError(t('formErrorSummary'));
+      return;
+    }
+    setFormError('');
+    onSave({ ...form, id: form.id || makeId(form.name), price: Number(form.price) || 0, description: useTemplate ? descriptionTemplate : form.description, tags: form.tags.split(',').map((value) => value.trim()).filter(Boolean), ingredients: form.ingredients.split(',').map((value) => value.trim()).filter(Boolean) });
+  };
+  const toggleTemplate = (checked) => {
+    setUseTemplate(checked);
+    if (checked) setForm((current) => ({ ...current, description: descriptionTemplate }));
+  };
+  return <Modal title={item ? t('editDrink') : t('addDrink')} onClose={onClose}><form noValidate onSubmit={submitForm} className="space-y-4"><FormError>{formError}</FormError><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className="field-label">{t('drinkName')}</span><input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label><span className="field-label">{t('basePrice')}</span><input type="number" min="0" step="0.01" className={inputClass} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label><label><span className="field-label">{t('category')}</span><select className={inputClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option value="">{t('selectCategory')}</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="sm:col-span-2"><span className="field-label">{t('description')}</span><textarea className={`${inputClass} min-h-24 resize-y`} value={useTemplate ? descriptionTemplate : form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} disabled={useTemplate} /></label><label className="sm:col-span-2 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3"><input type="checkbox" checked={useTemplate} onChange={(e) => toggleTemplate(e.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-700" /><span><span className="block text-xs font-black text-emerald-900">{t('useDescriptionTemplate')}</span><span className="mt-1 block text-xs leading-5 text-emerald-800">{t('descriptionTemplateHelp')}</span></span></label><label className="sm:col-span-2"><span className="field-label">{t('drinkImage')}</span><input type="file" accept="image/*" className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-xs file:font-black file:text-emerald-800`} onChange={(e) => handleImageUpload(e, setForm)} /></label>{form.image && <div className="sm:col-span-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"><img src={form.image} alt={form.name || t('drinkImage')} className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="text-xs font-black text-slate-700">{t('imagePreview')}</p><button type="button" onClick={() => setForm({ ...form, image: '' })} className="mt-1 text-xs font-bold text-red-700">{t('removeImage')}</button></div></div>}<label><span className="field-label">{t('prepTime')}</span><input className={inputClass} placeholder="15 min" value={form.prepTime} onChange={(e) => setForm({ ...form, prepTime: e.target.value })} /></label><label><span className="field-label">{t('tags')}</span><input className={inputClass} placeholder="Hot, Featured" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} /></label><label className="sm:col-span-2"><span className="field-label">{t('ingredients')}</span><input className={inputClass} placeholder="Coffee, milk, spice" value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })} /></label></div><div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700">{t('cancel')}</button><button type="submit" disabled={saving || !categories.length} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50">{saving && <Icons.LoaderCircle className="h-4 w-4 animate-spin" />}{t('saveDrink')}</button></div></form></Modal>;
+}
+
+function CategoryModal({ category, t, saving, onClose, onSave }) {
+  const [form, setForm] = useState(() => ({ id: category?.id || '', name: category?.name || '', icon: category?.icon || 'Utensils', sortOrder: category?.sortOrder ?? 0, translations: category?.translations || {} }));
+  const [formError, setFormError] = useState('');
+  const submitForm = (event) => { event.preventDefault(); if (!form.name.trim()) { setFormError(t('formErrorSummary')); return; } setFormError(''); onSave({ ...form, id: form.id || makeId(form.name), name: form.name.trim(), translations: { ...form.translations, en: form.name.trim() } }); };
+  return (
+    <Modal title={category ? t('editCategory') : t('addCategory')} onClose={onClose}>
+      <form noValidate onSubmit={submitForm} className="space-y-4">
+        <FormError>{formError}</FormError>
+        <label><span className="field-label">{t('categoryName')}</span><input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label><span className="field-label">{t('categoryIcon')}</span><select className={inputClass} value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })}>{iconChoices.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select></label>
+          <label><span className="field-label">{t('categoryOrder')}</span><input type="number" className={inputClass} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} /></label>
+        </div>
+        <div className="category-icon-preview flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">{renderIcon(form.icon, 'h-6 w-6')}</div>
+          <div><p className="text-xs font-black uppercase tracking-wider text-slate-500">{t('iconPreview')}</p><p className="mt-1 text-sm font-bold text-slate-800">{form.name || t('categoryPreview')}</p></div>
+        </div>
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700">{t('cancel')}</button><button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50">{saving && <Icons.LoaderCircle className="h-4 w-4 animate-spin" />}{t('saveCategory')}</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function BankModal({ bank, t, saving, onClose, onSave }) {
+  const [form, setForm] = useState(() => ({ id: bank?.id || '', bankName: bank?.bankName || '', accountName: bank?.accountName || '', accountNumber: bank?.accountNumber || '', type: bank?.type || 'cbe', color: bank?.color || '#166534' }));
+  const [formError, setFormError] = useState('');
+  const submitForm = (event) => { event.preventDefault(); if (!form.bankName.trim() || !form.accountName.trim() || !form.accountNumber.trim()) { setFormError(t('formErrorSummary')); return; } setFormError(''); onSave({ ...form, id: form.id || makeId(`${form.bankName}-${form.accountNumber}`) }); };
+  return <Modal title={bank ? t('editBank') : t('addBankAccount')} onClose={onClose}><form noValidate onSubmit={submitForm} className="space-y-4"><FormError>{formError}</FormError><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label><span className="field-label">{t('bankName')}</span><input className={inputClass} value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} /></label><label><span className="field-label">{t('bankType')}</span><select className={inputClass} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{bankTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label><span className="field-label">{t('accountHolder')}</span><input className={inputClass} value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} /></label><label><span className="field-label">{t('accountNumber')}</span><input className={inputClass} value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} /></label><label><span className="field-label">{t('accentColor')}</span><input type="color" className="h-12 w-full rounded-xl border border-slate-200 bg-white p-1" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></label></div><div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700">{t('cancel')}</button><button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50">{saving && <Icons.LoaderCircle className="h-4 w-4 animate-spin" />}{t('saveBank')}</button></div></form></Modal>;
 }

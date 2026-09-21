@@ -5,10 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 export default function TableTentCard({ tableNumber = 4, restaurantName = "Abu Coffee" }) {
   const { t } = useLanguage();
-  // Construct a URL pointing to the customer app for this table
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://abu-coffee.vercel.app';
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
-  const url = `${origin}${pathname}?table=${tableNumber}`;
+  const url = 'https://abu-coffee.vercel.app/';
 
   return (
     <div className="printable-area flex flex-col items-center select-none w-full max-w-xs mx-auto py-2">
@@ -101,10 +98,10 @@ export default function TableTentCard({ tableNumber = 4, restaurantName = "Abu C
           </div>
         </div>
 
-        {/* WhatsApp Notice Badge */}
+        {/* Digital menu notice */}
         <div className="mt-4 pt-2 w-full text-[10px] font-medium text-gray-400 flex items-center justify-center gap-1.5">
           <Icons.MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{t('tentWhatsAppBadge')}</span>
+          <span>{t('tentDigitalMenuBadge')}</span>
         </div>
       </div>
 

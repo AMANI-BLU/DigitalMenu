@@ -6,259 +6,288 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.en
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
   supabaseAnonKey &&
-  !supabaseUrl.includes('https://nlnevskfnqujwfpwqily.supabase.co')
+  supabaseUrl.startsWith('https://') &&
+  !supabaseUrl.includes('placeholder') &&
+  !supabaseUrl.includes('your-supabase-project')
 );
 
-// Create client instance when credentials exist, otherwise null
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-/**
- * Service helpers for Supabase sync
- */
+const throwIfError = ({ data, error }) => {
+  if (error) throw error;
+  return data;
+};
+
+const isMissingRelation = (error, relation) => Boolean(
+  error && (
+    error.code === 'PGRST205' ||
+    error.message?.includes(`public.${relation}`) ||
+    error.message?.includes(`relation \"${relation}\" does not exist`)
+  )
+);
+
+const mapCategory = (category) => ({
+  id: category.id,
+  name: category.name,
+  icon: category.icon || 'Utensils',
+  sortOrder: category.sort_order ?? 0,
+  active: category.active !== false,
+  translations: category.translations || {},
+});
+
+const mapMenuItem = (item) => ({
+  id: item.id,
+  name: item.name,
+  description: item.description || '',
+  price: Number(item.price) || 0,
+  category: item.category,
+  image: item.image || '',
+  tags: item.tags || [],
+  rating: Number(item.rating) || 0,
+  reviews: Number(item.reviews) || 0,
+  prepTime: item.prep_time || '',
+  ingredients: item.ingredients || [],
+  customizations: item.customizations || [],
+  translations: item.translations || {},
+});
+
+const mapBankAccount = (bank) => ({
+  id: bank.id,
+  bankName: bank.bank_name,
+  accountName: bank.account_name,
+  accountNumber: bank.account_number,
+  type: bank.type || 'cbe',
+  color: bank.color || '#166534',
+});
+
+const mapReview = (review) => ({
+  id: review.id,
+  tableNumber: review.table_number || 'Customer',
+  rating: review.rating,
+  comment: review.comment || '',
+  timestamp: review.created_at ? new Date(review.created_at).toLocaleDateString() : '',
+});
+
 export const supabaseService = {
-  // Check connection status
   isConfigured: () => isSupabaseConfigured,
 
-  // Orders table sync
-  async getOrders() {
+  async getSession() {
     if (!supabase) return null;
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return data.session;
+  },
+
+  async signInAdmin(email, password) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    const { data: adminUser, error: adminError } = await supabase
+      .from('admin_users')
+      .select('id')
+      .eq('id', data.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminUser) {
+      await supabase.auth.signOut();
+      throw new Error('This account is not allowed to access the admin dashboard.');
+    }
+
+    return data.session;
+  },
+
+  async isAdminUser(user) {
+    if (!supabase || !user) return false;
     const { data, error } = await supabase
-      .from('orders')
+      .from('admin_users')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle();
+    return !error && Boolean(data);
+  },
+
+  async signOut() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+  },
+
+  async updateAdminCredentials({ email, password }) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const updates = {};
+    if (email?.trim()) updates.email = email.trim();
+    if (password) updates.password = password;
+    if (Object.keys(updates).length === 0) {
+      throw new Error('Enter a new email or password.');
+    }
+
+    const { data, error } = await supabase.auth.updateUser(updates);
+    if (error) throw error;
+    return data.user;
+  },
+
+  async getCategories() {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('categories')
       .select('*')
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.warn('Supabase getOrders error:', error);
-      return null;
-    }
-    return data.map(o => ({
-      id: o.id,
-      orderType: o.order_type || o.orderType || 'dine-in',
-      tableNumber: o.table_number || o.tableNumber || null,
-      items: o.items || [],
-      subtotal: parseFloat(o.subtotal) || 0,
-      deliveryDetails: o.delivery_details || o.deliveryDetails || null,
-      offerApplied: o.offer_applied || o.offerApplied || null,
-      status: o.status || 'pending',
-      timestamp: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }));
+      .eq('active', true)
+      .order('sort_order', { ascending: true });
+    return throwIfError({ data: (data || []).map(mapCategory), error });
   },
 
-  async createOrder(order) {
-    if (!supabase) return null;
-    const dbPayload = {
-      id: order.id,
-      order_type: order.orderType || 'dine-in',
-      table_number: order.tableNumber || null,
-      items: order.items || [],
-      subtotal: parseFloat(order.subtotal) || 0,
-      delivery_details: order.deliveryDetails || null,
-      offer_applied: order.offerApplied || null,
-      status: order.status || 'pending'
+  async saveCategory(category) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const payload = {
+      id: category.id,
+      name: category.name,
+      icon: category.icon || 'Utensils',
+      sort_order: Number(category.sortOrder) || 0,
+      active: category.active !== false,
+      translations: category.translations || { en: category.name },
     };
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([dbPayload])
-      .select();
-    if (error) {
-      console.warn('Supabase createOrder error:', error);
-      return null;
-    }
-    return data?.[0] || null;
+    const { data, error } = await supabase.from('categories').upsert(payload).select().single();
+    return mapCategory(throwIfError({ data, error }));
   },
 
-  async updateOrderStatus(orderId, status) {
-    if (!supabase) return false;
-    const { error } = await supabase
-      .from('orders')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
-    if (error) {
-      console.warn('Supabase updateOrderStatus error:', error);
-      return false;
-    }
+  async deleteCategory(categoryId) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+    throwIfError({ data: true, error });
     return true;
   },
 
-  // Waiter calls sync
-  async getWaiterCalls() {
-    if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('waiter_calls')
-      .select('*')
-      .eq('resolved', false)
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.warn('Supabase getWaiterCalls error:', error);
-      return null;
-    }
-    return data.map(c => ({
-      id: c.id,
-      tableNumber: c.table_number || 'Customer',
-      reason: c.reason,
-      timestamp: c.timestamp || new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }));
-  },
-
-  async createWaiterCall(call) {
-    if (!supabase) return null;
-    const dbPayload = {
-      table_number: call.tableNumber || 'Customer',
-      reason: call.reason || 'Service',
-      timestamp: call.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    const { data, error } = await supabase
-      .from('waiter_calls')
-      .insert([dbPayload])
-      .select();
-    if (error) {
-      console.warn('Supabase createWaiterCall error:', error);
-      return null;
-    }
-    return data?.[0] || null;
-  },
-
-  async resolveWaiterCall(callId) {
-    if (!supabase) return false;
-    const { error } = await supabase
-      .from('waiter_calls')
-      .update({ resolved: true })
-      .eq('id', callId);
-    if (error) {
-      console.warn('Supabase resolveWaiterCall error:', error);
-      return false;
-    }
-    return true;
-  },
-
-  // Reviews sync
-  async getReviews() {
-    if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.warn('Supabase getReviews error:', error);
-      return null;
-    }
-    return data.map(r => ({
-      id: r.id,
-      tableNumber: r.table_number || 'Customer Review',
-      rating: r.rating,
-      comment: r.comment,
-      timestamp: new Date(r.created_at).toLocaleDateString()
-    }));
-  },
-
-  async createReview(review) {
-    if (!supabase) return null;
-    const dbPayload = {
-      table_number: review.tableNumber || 'Customer',
-      rating: review.rating,
-      comment: review.comment
-    };
-    const { data, error } = await supabase
-      .from('reviews')
-      .insert([dbPayload])
-      .select();
-    if (error) {
-      console.warn('Supabase createReview error:', error);
-      return null;
-    }
-    return data?.[0] || null;
-  },
-
-  // Menu items sync
   async getMenuItems() {
-    if (!supabase) return null;
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('menu_items')
-      .select('*');
-    if (error) {
-      console.warn('Supabase getMenuItems error:', error);
-      return null;
-    }
-    return data;
+      .select('*')
+      .eq('active', true)
+      .order('created_at', { ascending: true });
+    return throwIfError({ data: (data || []).map(mapMenuItem), error });
   },
 
   async saveMenuItem(item) {
-    if (!supabase) return false;
-    const { error } = await supabase
-      .from('menu_items')
-      .upsert([item]);
-    if (error) {
-      console.warn('Supabase saveMenuItem error:', error);
-      return false;
-    }
-    return true;
+    if (!supabase) throw new Error('The database is not configured.');
+    const payload = {
+      id: item.id,
+      name: item.name,
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      category: item.category,
+      image: item.image || '',
+      tags: item.tags || [],
+      rating: Number(item.rating) || 0,
+      reviews: Number(item.reviews) || 0,
+      prep_time: item.prepTime || '',
+      ingredients: item.ingredients || [],
+      customizations: item.customizations || [],
+      translations: item.translations || { en: { name: item.name, description: item.description || '' } },
+      active: true,
+    };
+    const { data, error } = await supabase.from('menu_items').upsert(payload).select().single();
+    return mapMenuItem(throwIfError({ data, error }));
   },
 
   async deleteMenuItem(itemId) {
-    if (!supabase) return false;
-    const { error } = await supabase
-      .from('menu_items')
-      .delete()
-      .eq('id', itemId);
-    if (error) {
-      console.warn('Supabase deleteMenuItem error:', error);
-      return false;
-    }
+    if (!supabase) throw new Error('The database is not configured.');
+    const { error } = await supabase.from('menu_items').delete().eq('id', itemId);
+    throwIfError({ data: true, error });
     return true;
   },
 
-  // Bank accounts sync
   async getBankAccounts() {
-    if (!supabase) return null;
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('bank_accounts')
       .select('*')
       .order('created_at', { ascending: true });
-    if (error) {
-      console.warn('Supabase getBankAccounts error:', error);
-      return null;
-    }
-    return data.map(b => ({
-      id: b.id,
-      bankName: b.bank_name || b.bankName,
-      accountName: b.account_name || b.accountName,
-      accountNumber: b.account_number || b.accountNumber,
-      type: b.type || 'cbe',
-      color: b.color || '#6a1b9a'
-    }));
+    return throwIfError({ data: (data || []).map(mapBankAccount), error });
   },
 
   async saveBankAccount(bank) {
-    if (!supabase) return false;
-    const dbPayload = {
+    if (!supabase) throw new Error('The database is not configured.');
+    const payload = {
       id: bank.id,
-      bank_name: bank.bankName || bank.bank_name,
-      account_name: bank.accountName || bank.account_name,
-      account_number: bank.accountNumber || bank.account_number,
+      bank_name: bank.bankName,
+      account_name: bank.accountName,
+      account_number: bank.accountNumber,
       type: bank.type || 'cbe',
-      color: bank.color || '#6a1b9a'
+      color: bank.color || '#166534',
     };
-    const { error } = await supabase
-      .from('bank_accounts')
-      .upsert([dbPayload]);
-    if (error) {
-      console.warn('Supabase saveBankAccount error:', error);
-      return false;
-    }
-    return true;
+    const { data, error } = await supabase.from('bank_accounts').upsert(payload).select().single();
+    return mapBankAccount(throwIfError({ data, error }));
   },
 
   async deleteBankAccount(bankId) {
-    if (!supabase) return false;
-    const { error } = await supabase
-      .from('bank_accounts')
-      .delete()
-      .eq('id', bankId);
-    if (error) {
-      console.warn('Supabase deleteBankAccount error:', error);
-      return false;
-    }
+    if (!supabase) throw new Error('The database is not configured.');
+    const { error } = await supabase.from('bank_accounts').delete().eq('id', bankId);
+    throwIfError({ data: true, error });
     return true;
-  }
+  },
+
+  async getSettings() {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('restaurant_settings')
+      .select('*')
+      .eq('id', 'default')
+      .maybeSingle();
+    if (isMissingRelation(error, 'restaurant_settings')) return null;
+    const settings = throwIfError({ data, error });
+    return settings
+      ? { restaurantName: settings.restaurant_name, tagline: settings.tagline, theme: settings.theme || 'forest', mode: settings.mode || 'light' }
+      : null;
+  },
+
+  async saveSettings(settings) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const payload = {
+      id: 'default',
+      restaurant_name: settings.restaurantName,
+      tagline: settings.tagline,
+      theme: settings.theme || 'forest',
+      mode: settings.mode || 'light',
+    };
+    const { data, error } = await supabase.from('restaurant_settings').upsert(payload).select().single();
+    const saved = throwIfError({ data, error });
+    return { restaurantName: saved.restaurant_name, tagline: saved.tagline, theme: saved.theme || 'forest', mode: saved.mode || 'light' };
+  },
+
+  async getReviews() {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .order('created_at', { ascending: false });
+    return throwIfError({ data: (data || []).map(mapReview), error });
+  },
+
+  async deleteReview(reviewId) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+    throwIfError({ data: true, error });
+    return true;
+  },
+
+  async createReview(review) {
+    if (!supabase) throw new Error('The database is not configured.');
+    const { error } = await supabase
+      .from('reviews')
+      .insert({
+        table_number: review.tableNumber || 'Customer',
+        rating: review.rating,
+        comment: review.comment || '',
+      });
+    throwIfError({ data: true, error });
+    return {
+      id: `local-${Date.now()}`,
+      tableNumber: review.tableNumber || 'Customer',
+      rating: review.rating,
+      comment: review.comment || '',
+      timestamp: new Date().toLocaleDateString(),
+    };
+  },
 };

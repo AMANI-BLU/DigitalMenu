@@ -23,12 +23,12 @@
   --primary-rgb: 21, 128, 61;
   --accent: #d4af37;
   --accent-rgb: 212, 175, 55;
-  --whatsapp: #25D366;
-  --whatsapp-hover: #1EBE5D;
-  --whatsapp-dark: #075E54;
   --bg-primary: #f8f6f0;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0ece1;
+  --surface: #f8f6f0;
+  --card-surface: #ffffff;
+  --shell-text: #1c1917;
   --text-primary: #1c1917;
   --text-secondary: #57534e;
   --text-light: #ffffff;
@@ -42,12 +42,12 @@
   --primary-rgb: 21, 128, 61;
   --accent: #d4af37;
   --accent-rgb: 212, 175, 55;
-  --whatsapp: #25D366;
-  --whatsapp-hover: #1EBE5D;
-  --whatsapp-dark: #075E54;
   --bg-primary: #f8f6f0;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0ece1;
+  --surface: #f8f6f0;
+  --card-surface: #ffffff;
+  --shell-text: #1c1917;
   --text-primary: #1c1917;
   --text-secondary: #57534e;
   --border-color: #e7e5e4;
@@ -63,6 +63,9 @@
   --bg-primary: #fbf7f0;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0e6d2;
+  --surface: #fbf7f0;
+  --card-surface: #ffffff;
+  --shell-text: #111827;
   --text-primary: #111827;
   --text-secondary: #555e6c;
   --border-color: #ebdcb9;
@@ -70,18 +73,21 @@
 
 /* Theme 3: Midnight Luxury (Sleek Dark & Crimson/Gold) */
 .theme-midnight {
-  --primary: #e63946;
-  --primary-hover: #c92a35;
-  --primary-rgb: 230, 57, 70;
-  --accent: #ffb703;
-  --accent-rgb: 255, 183, 3;
-  --bg-primary: #0c0d12;
-  --bg-secondary: #171923;
-  --bg-tertiary: #1f2232;
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --border-color: #2d3142;
-  --shadow-color: rgba(0, 0, 0, 0.4);
+  --primary: #4f8fe8;
+  --primary-hover: #70a8f2;
+  --primary-rgb: 79, 143, 232;
+  --accent: #f2c078;
+  --accent-rgb: 242, 192, 120;
+  --bg-primary: #0e2038;
+  --bg-secondary: #182f4e;
+  --bg-tertiary: #203b5d;
+  --surface: #0e2038;
+  --card-surface: #182f4e;
+  --shell-text: #edf5ff;
+  --text-primary: #edf5ff;
+  --text-secondary: #b7c9df;
+  --border-color: #345477;
+  --shadow-color: rgba(4, 17, 35, 0.45);
 }
 
 /* Theme 4: Blossom Cafe (Soft Pink & Sage) */
@@ -94,6 +100,9 @@
   --bg-primary: #fdf8f9;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f9eff1;
+  --surface: #fdf8f9;
+  --card-surface: #ffffff;
+  --shell-text: #3d303b;
   --text-primary: #3d303b;
   --text-secondary: #6e5e6b;
   --border-color: #f0dfe3;
@@ -114,6 +123,128 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
   -webkit-overflow-scrolling: touch;
+}
+
+.mode-dark {
+  color-scheme: dark;
+  --surface: #0c0d12;
+  --card-surface: #171923;
+  --shell-text: #f3f4f6;
+  --border-color: #2d3142;
+}
+
+.theme-midnight.mode-dark {
+  --surface: #0e2038;
+  --card-surface: #182f4e;
+  --shell-text: #edf5ff;
+  --border-color: #345477;
+}
+
+.customer-shell,
+.admin-shell {
+  background-color: var(--surface) !important;
+  color: var(--shell-text);
+}
+
+.mode-dark .customer-shell header,
+.mode-dark .customer-shell nav,
+.mode-dark .customer-shell .bg-white,
+.mode-dark .customer-shell .bg-stone-50,
+.mode-dark .customer-shell .bg-stone-100,
+.mode-dark .admin-shell .bg-white,
+.mode-dark .admin-shell .bg-slate-50,
+.mode-dark .admin-shell header {
+  background-color: var(--card-surface) !important;
+  color: var(--shell-text) !important;
+  border-color: var(--border-color) !important;
+}
+
+.mode-dark .customer-shell .text-stone-900,
+.mode-dark .customer-shell .text-stone-800,
+.mode-dark .customer-shell .text-stone-700,
+.mode-dark .admin-shell .text-slate-950,
+.mode-dark .admin-shell .text-slate-900,
+.mode-dark .admin-shell .text-slate-800,
+.mode-dark .admin-shell .text-slate-700 {
+  color: var(--shell-text) !important;
+}
+
+.mode-dark .customer-shell input,
+.mode-dark .customer-shell textarea,
+.mode-dark .admin-shell input,
+.mode-dark .admin-shell textarea,
+.mode-dark .admin-shell select {
+  background-color: #0f131c !important;
+  color: #f8fafc !important;
+  border-color: var(--border-color) !important;
+}
+
+.mode-dark .customer-shell .border-stone-200,
+.mode-dark .customer-shell .border-stone-300,
+.mode-dark .admin-shell .border-slate-200,
+.mode-dark .admin-shell .border-slate-100 {
+  border-color: var(--border-color) !important;
+}
+
+.mode-dark .admin-shell .settings-theme-option-selected {
+  background-color: #123b32 !important;
+  border-color: #34d399 !important;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.16) !important;
+}
+
+.mode-dark .admin-shell .settings-theme-label,
+.mode-dark .admin-shell .category-icon-preview p {
+  color: #e2e8f0 !important;
+}
+
+.mode-dark .admin-shell .category-icon-preview {
+  background-color: #0f131c !important;
+  border-color: var(--border-color) !important;
+}
+
+.theme-midnight .customer-shell header,
+.theme-midnight .customer-shell nav,
+.theme-midnight .customer-shell .bg-white,
+.theme-midnight .admin-shell .bg-white,
+.theme-midnight .admin-shell header {
+  background-color: var(--card-surface) !important;
+  color: var(--shell-text) !important;
+  border-color: var(--border-color) !important;
+}
+
+.theme-midnight .customer-shell .text-stone-900,
+.theme-midnight .customer-shell .text-stone-800,
+.theme-midnight .customer-shell .text-stone-700,
+.theme-midnight .admin-shell .text-slate-950,
+.theme-midnight .admin-shell .text-slate-900,
+.theme-midnight .admin-shell .text-slate-800,
+.theme-midnight .admin-shell .text-slate-700 {
+  color: var(--shell-text) !important;
+}
+
+.theme-midnight.mode-dark .customer-shell input,
+.theme-midnight.mode-dark .customer-shell textarea,
+.theme-midnight.mode-dark .admin-shell input,
+.theme-midnight.mode-dark .admin-shell textarea,
+.theme-midnight.mode-dark .admin-shell select {
+  background-color: #102943 !important;
+}
+
+:is(.theme-amber, .theme-midnight, .theme-blossom) .bg-emerald-700,
+:is(.theme-amber, .theme-midnight, .theme-blossom) .bg-emerald-600,
+:is(.theme-amber, .theme-midnight, .theme-blossom) .bg-emerald-500 {
+  background-color: var(--primary) !important;
+}
+
+:is(.theme-amber, .theme-midnight, .theme-blossom) .text-emerald-700,
+:is(.theme-amber, .theme-midnight, .theme-blossom) .text-emerald-800,
+:is(.theme-amber, .theme-midnight, .theme-blossom) .text-emerald-900 {
+  color: var(--primary) !important;
+}
+
+:is(.theme-amber, .theme-midnight, .theme-blossom) .border-emerald-500,
+:is(.theme-amber, .theme-midnight, .theme-blossom) .border-emerald-600 {
+  border-color: var(--primary) !important;
 }
 
 h1, h2, h3, h4, h5, h6, .font-heading {
@@ -209,37 +340,14 @@ img {
   }
 }
 
-/* Custom WhatsApp Button Glow and Ripple */
-@keyframes pulse-subtle {
-  0%, 100% {
-    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
-  }
-  50% {
-    box-shadow: 0 6px 22px rgba(37, 211, 102, 0.55);
-  }
-}
-
-.whatsapp-glow {
-  animation: pulse-subtle 2.5s infinite ease-in-out;
-}
-
-/* Chat bubble styling */
-.whatsapp-chat-bubble {
-  position: relative;
-  background-color: #dcf8c6;
-  border-radius: 16px 16px 4px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-}
-
-.whatsapp-chat-bubble::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  right: -6px;
-  width: 12px;
-  height: 12px;
-  background: #dcf8c6;
-  clip-path: polygon(0 0, 0% 100%, 100% 100%);
+.field-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .wood-texture {

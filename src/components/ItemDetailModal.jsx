@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
-import { dishImagesMap } from '../data/initialMenu';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function ItemDetailModal({ item, onClose }) {
@@ -58,14 +57,14 @@ export default function ItemDetailModal({ item, onClose }) {
     });
   };
 
-  const renderDishGraphics = (imageType) => {
-    const imageUrl = dishImagesMap[imageType] || (imageType && imageType.startsWith('http') ? imageType : null);
+  const renderDrinkGraphics = (imageType) => {
+    const imageSource = imageType && (imageType.startsWith('http') || imageType.startsWith('data:image/')) ? imageType : null;
 
-    if (imageUrl) {
+    if (imageSource) {
       return (
         <div className="w-full h-48 rounded-2xl overflow-hidden relative border border-border-color shadow-sm">
           <img 
-            src={imageUrl} 
+            src={imageSource}
             alt={item.name} 
             className="w-full h-full object-cover"
           />
@@ -116,7 +115,7 @@ export default function ItemDetailModal({ item, onClose }) {
         {/* Header Drag Bar / Close Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-opacity-95 backdrop-blur-sm" style={{ backgroundColor: 'var(--bg-secondary)' }}>
           <h2 className="text-lg sm:text-xl font-bold tracking-tight leading-none" style={{ fontFamily: 'var(--font-heading)' }}>
-            {t('dishDetailsTitle')}
+            {t('itemDetailsTitle')}
           </h2>
           <button 
             onClick={onClose}
@@ -130,10 +129,10 @@ export default function ItemDetailModal({ item, onClose }) {
         <div className="px-4 sm:px-6 pb-28 flex-1">
           {/* Cover Image/Graphics */}
           <div className="mt-2">
-            {renderDishGraphics(item.image)}
+            {renderDrinkGraphics(item.image)}
           </div>
 
-          {/* Dish Specs & Pricing */}
+            {/* Drink details and pricing */}
           <div className="mt-4">
             <div className="flex justify-between items-start">
               <h3 className="text-xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
