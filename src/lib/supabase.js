@@ -238,7 +238,7 @@ export const supabaseService = {
     if (isMissingRelation(error, 'restaurant_settings')) return null;
     const settings = throwIfError({ data, error });
     return settings
-      ? { restaurantName: settings.restaurant_name, tagline: settings.tagline, theme: settings.theme || 'forest', mode: settings.mode || 'light' }
+      ? { restaurantName: settings.restaurant_name, tagline: settings.tagline, theme: settings.theme || 'forest', mode: settings.mode || 'light', menuVisible: settings.menu_visible !== false }
       : null;
   },
 
@@ -250,10 +250,11 @@ export const supabaseService = {
       tagline: settings.tagline,
       theme: settings.theme || 'forest',
       mode: settings.mode || 'light',
+      menu_visible: settings.menuVisible !== false,
     };
     const { data, error } = await supabase.from('restaurant_settings').upsert(payload).select().single();
     const saved = throwIfError({ data, error });
-    return { restaurantName: saved.restaurant_name, tagline: saved.tagline, theme: saved.theme || 'forest', mode: saved.mode || 'light' };
+    return { restaurantName: saved.restaurant_name, tagline: saved.tagline, theme: saved.theme || 'forest', mode: saved.mode || 'light', menuVisible: saved.menu_visible !== false };
   },
 
   async getReviews() {

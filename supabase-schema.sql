@@ -60,6 +60,7 @@ create table if not exists public.restaurant_settings (
   tagline text not null default 'Digital menu for your restaurant',
   theme text not null default 'forest',
   mode text not null default 'light' check (mode in ('light', 'dark')),
+  menu_visible boolean not null default true,
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
 
@@ -76,6 +77,7 @@ alter table public.menu_items add column if not exists active boolean not null d
 alter table public.menu_items add column if not exists updated_at timestamptz not null default timezone('utc'::text, now());
 alter table public.bank_accounts add column if not exists updated_at timestamptz not null default timezone('utc'::text, now());
 alter table public.restaurant_settings add column if not exists mode text not null default 'light';
+alter table public.restaurant_settings add column if not exists menu_visible boolean not null default true;
 
 -- Remove the four records created by the previous local demo seeding code.
 delete from public.bank_accounts

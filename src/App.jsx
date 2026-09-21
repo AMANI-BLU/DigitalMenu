@@ -11,6 +11,7 @@ const emptyStore = {
   tagline: 'Digital menu for your restaurant',
   theme: 'forest',
   mode: 'light',
+  menuVisible: true,
 };
 
 export default function App() {
@@ -184,6 +185,13 @@ export default function App() {
     });
   };
 
+  const handleToggleMenuVisibility = async () => {
+    const next = { ...store, menuVisible: !store.menuVisible };
+    await withRefresh(() => supabaseService.saveSettings(next), (saved) => {
+      setStore(saved);
+    });
+  };
+
   const handleToggleMode = () => {
     const nextMode = (modeOverride || store.mode || 'light') === 'dark' ? 'light' : 'dark';
     setModeOverride(nextMode);
@@ -272,6 +280,7 @@ export default function App() {
           restaurantName={store.restaurantName}
           tagline={store.tagline}
           bankAccounts={bankAccounts}
+          menuVisible={store.menuVisible !== false}
           adminEmail={session?.user?.email || ''}
           onSaveMenuItem={handleSaveMenuItem}
           onDeleteMenuItem={handleDeleteMenuItem}
@@ -285,6 +294,13 @@ export default function App() {
           onUpdateCredentials={supabaseService.updateAdminCredentials}
           onSignOut={closeAdmin}
           onToggleAdmin={closeAdmin}
+          onToggleMenuVisibility={handleToggleMenuVisibility}
+        />
+      ) : store.menuVisible === false ? (
+        <MenuClosedScreen
+          restaurantName={store.restaurantName}
+          theme={store.theme}
+          effectiveMode={effectiveMode}
         />
       ) : (
         <CustomerMenu
@@ -303,6 +319,36 @@ export default function App() {
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+    </div>
+  );
+}
+
+function MenuClosedScreen({ restaurantName, theme, effectiveMode }) {
+  return (
+    <div className={`min-h-screen bg-bg-primary font-body theme-${theme || 'forest'} mode-${effectiveMode} flex items-center justify-center px-6`}>
+      <div className="w-full max-w-md text-center">
+        <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-white shadow-2xl shadow-black/10 ring-1 ring-black/5">
+          <img src="/abu-coffee-logo.png" alt={restaurantName} className="h-16 w-16 rounded-[1.5rem] object-cover" />
+        </div>
+        <div className="rounded-3xl border border-stone-200 bg-white px-8 py-10 shadow-xl">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/>
+            </svg>
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-950">{restaurantName || 'Abu Coffee'}</h1>
+          <p className="mt-3 text-base font-bold text-amber-600">Closed for Today</p>
+          <p className="mx-auto mt-3 max-w-xs text-sm leading-6 text-slate-500">
+            Our menu is temporarily unavailable. We'll be back soon — thank you for your patience!
+          </p>
+          <div className="mt-7 inline-flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Check back again soon
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

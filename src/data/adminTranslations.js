@@ -113,6 +113,15 @@ const english = {
   adminAccessDenied: 'This account is not allowed to access the admin dashboard.',
   databaseNotConfigured: 'The database is not configured for this deployment. Add the Supabase environment variables and run the database schema.',
   loading: 'Loading…',
+  menuVisibility: 'Menu visibility',
+  menuVisibilityDescription: 'Control whether customers can see the menu. Turn this off on days the café is closed.',
+  menuVisible: 'Menu is live — customers can browse',
+  menuHidden: 'Menu is hidden — customers see a closed message',
+  showMenu: 'Show menu',
+  hideMenu: 'Hide menu',
+  menuStatusLive: 'Live',
+  menuStatusHidden: 'Hidden',
+  quickToggle: 'Quick toggle',
 };
 
 export const adminTranslations = {
