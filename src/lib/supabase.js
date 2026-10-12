@@ -118,26 +118,47 @@ export const supabaseService = {
   async updateAdminCredentials({ email, password }) {
     if (!supabase) throw new Error('The database is not configured.');
 
-    // Get the current user so we can skip a no-op email change.
-    // Supabase throws "email is invalid" when you try to set the
-    // same email that's already on the account.
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    // Fetch the live current email from Supabase Auth.
+    let currentEmail = '';
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      currentEmail = user?.email?.trim().toLowerCase() || '';
+    } catch (_) {
+      // getUser failed — proceed without the comparison guard.
+    }
+
     const newEmail = email?.trim().toLowerCase();
-    const currentEmail = currentUser?.email?.toLowerCase();
 
     const updates = {};
-    if (newEmail && newEmail !== currentEmail) updates.email = newEmail;
-    if (password) updates.password = password;
+    // Only include email in the update if it is genuinely different.
+    if (newEmail && newEmail !== currentEmail) {
+      updates.email = newEmail;
+    }
+    if (password) {
+      updates.password = password;
+    }
 
+    // Nothing to change — return silently without hitting Supabase.
     if (Object.keys(updates).length === 0) {
-      // Nothing actually changed — treat as success silently.
-      return currentUser;
+      return null;
     }
 
     // The DB trigger `on_auth_user_email_updated` automatically syncs
     // the email to the admin_users table — no manual update needed here.
     const { data, error } = await supabase.auth.updateUser(updates);
-    if (error) throw error;
+
+    if (error) {
+      // Supabase returns a cryptic "email is invalid" when the submitted
+      // email is the same as the current one (race condition / stale state).
+      // Translate it into something useful.
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('invalid') && msg.includes('@')) {
+        throw new Error(
+          'That email address is already your current email. Enter a different one, or leave the email field empty to change only the password.'
+        );
+      }
+      throw error;
+    }
     return data.user;
   },
 
