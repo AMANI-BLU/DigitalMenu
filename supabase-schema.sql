@@ -107,6 +107,12 @@ create policy "Admin users can read their own record"
   on public.admin_users for select
   using (id = auth.uid());
 
+drop policy if exists "Admin users can update their own record" on public.admin_users;
+create policy "Admin users can update their own record"
+  on public.admin_users for update
+  using (id = auth.uid())
+  with check (id = auth.uid());
+
 drop policy if exists "Anyone can read active categories" on public.categories;
 create policy "Anyone can read active categories"
   on public.categories for select
@@ -166,9 +172,19 @@ create policy "Admins manage reviews"
   on public.reviews for delete
   using (public.is_admin());
 
--- Create the admin in Authentication first, then run this for that user's email:
+-- ============================================================
+-- HOW TO CREATE / RECREATE THE ADMIN USER
+-- ============================================================
+-- Step 1: Go to Supabase Dashboard → Authentication → Users
+--         → "Add User" → enter the email & password → click Create.
+--
+-- Step 2: Copy the user's UUID from the list, then run this SQL
+--         in the Supabase SQL Editor (replace the email below):
+--
 -- insert into public.admin_users (id, email)
--- select id, email from auth.users where email = 'admin@example.com';
-
+-- select id, email from auth.users where email = 'admin@example.com'
+-- on conflict (id) do update set email = excluded.email;
+--
+-- ============================================================
 -- Refresh PostgREST so the client sees newly created tables immediately.
 notify pgrst, 'reload schema';

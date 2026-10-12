@@ -207,6 +207,14 @@ export default function App() {
     window.localStorage.setItem('abu_coffee_mode', nextMode);
   };
 
+  const handleUpdateCredentials = async (credentials) => {
+    const user = await supabaseService.updateAdminCredentials(credentials);
+    // Refresh the session so the displayed email updates immediately.
+    const refreshed = await supabaseService.getSession();
+    if (refreshed) setSession(refreshed);
+    return user;
+  };
+
   const handleAddReview = async (review) => {
     try {
       const saved = await supabaseService.createReview(review);
@@ -303,7 +311,7 @@ export default function App() {
           onDeleteReview={handleDeleteReview}
           onUpdateSettings={handleSaveSettings}
           onPreviewSettings={(draft) => setStore((current) => ({ ...current, ...draft }))}
-          onUpdateCredentials={supabaseService.updateAdminCredentials}
+          onUpdateCredentials={handleUpdateCredentials}
           onSignOut={closeAdmin}
           onToggleAdmin={closeAdmin}
           onToggleMenuVisibility={handleToggleMenuVisibility}

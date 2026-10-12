@@ -118,7 +118,8 @@ export const supabaseService = {
   async updateAdminCredentials({ email, password }) {
     if (!supabase) throw new Error('The database is not configured.');
     const updates = {};
-    if (email?.trim()) updates.email = email.trim();
+    const newEmail = email?.trim();
+    if (newEmail) updates.email = newEmail;
     if (password) updates.password = password;
     if (Object.keys(updates).length === 0) {
       throw new Error('Enter a new email or password.');
@@ -126,6 +127,26 @@ export const supabaseService = {
 
     const { data, error } = await supabase.auth.updateUser(updates);
     if (error) throw error;
+
+    // Sync the email in the admin_users table whenever the auth email changes.
+    // Note: Supabase may hold the new email in `new_email` until confirmed,
+    // so we write whichever field is populated.
+    if (newEmail) {
+      const resolvedEmail = data.user?.email || newEmail;
+      const { error: tableError } = await supabase
+        .from('admin_users')
+        .update({ email: resolvedEmail })
+        .eq('id', data.user.id);
+      if (tableError) {
+        // Non-fatal: auth was updated; warn but don't throw so the user knows it partially worked.
+        console.warn('admin_users email sync failed:', tableError.message);
+        throw new Error(
+          `Auth email updated but the profile table could not be synced: ${tableError.message}. ` +
+          'Run the SQL policy fix in supabase-schema.sql and try again.'
+        );
+      }
+    }
+
     return data.user;
   },
 
