@@ -504,6 +504,15 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
     event.preventDefault();
     setCredentialsError('');
     setCredentialsMessage('');
+
+    const newEmail = credentials.email.trim().toLowerCase();
+    const currentEmail = adminEmail?.toLowerCase();
+
+    // Catch same-email submissions before hitting Supabase.
+    if (newEmail && newEmail === currentEmail) {
+      setCredentialsError('That is already your current email address. Enter a different one.');
+      return;
+    }
     if (credentials.password && credentials.password !== credentials.confirmPassword) {
       setCredentialsError(t('passwordsDoNotMatch'));
       return;
@@ -512,18 +521,16 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
       setCredentialsError(t('passwordTooShort'));
       return;
     }
-    const isChangingEmail = Boolean(credentials.email.trim()) && credentials.email.trim().toLowerCase() !== adminEmail?.toLowerCase();
+    if (!newEmail && !credentials.password) {
+      setCredentialsError('Enter a new email or a new password.');
+      return;
+    }
+    const isChangingEmail = Boolean(newEmail);
     setCredentialsSaving(true);
     try {
       await onUpdateCredentials({ email: credentials.email, password: credentials.password });
       setCredentials({ email: '', password: '', confirmPassword: '' });
-      // Supabase holds email changes pending confirmation by default.
-      // Show a specific message so the admin knows to check their inbox.
-      setCredentialsMessage(
-        isChangingEmail
-          ? '✉️ Confirmation email sent to the new address — click the link to apply the change. Password was updated immediately.'
-          : t('credentialsUpdated')
-      );
+      setCredentialsMessage(isChangingEmail ? '✅ Email updated successfully.' : t('credentialsUpdated'));
     } catch (credentialError) {
       setCredentialsError(credentialError.message || t('credentialsUpdateFailed'));
     } finally {
@@ -593,7 +600,7 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
           <p className="mt-2 text-sm leading-6 text-slate-500">{t('accountSecurityDescription')}</p>
           <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{t('currentAdminEmail')}: {adminEmail || t('notAvailable')}</p>
           <div className="mt-5 space-y-4">
-            <label><span className="field-label">{t('newAdminEmail')}</span><input type="email" autoComplete="email" className={inputClass} value={credentials.email} onChange={(e) => setCredentials({ ...credentials, email: e.target.value })} placeholder={adminEmail} /></label>
+            <label><span className="field-label">{t('newAdminEmail')}</span><input type="email" autoComplete="off" className={inputClass} value={credentials.email} onChange={(e) => setCredentials({ ...credentials, email: e.target.value })} placeholder="Enter new email address" /></label>
             <label><span className="field-label">{t('newAdminPassword')}</span><input type="password" autoComplete="new-password" minLength="8" className={inputClass} value={credentials.password} onChange={(e) => setCredentials({ ...credentials, password: e.target.value })} /></label>
             <label><span className="field-label">{t('confirmAdminPassword')}</span><input type="password" autoComplete="new-password" minLength="8" className={inputClass} value={credentials.confirmPassword} onChange={(e) => setCredentials({ ...credentials, confirmPassword: e.target.value })} /></label>
           </div>
