@@ -117,12 +117,23 @@ export const supabaseService = {
 
   async updateAdminCredentials({ email, password }) {
     if (!supabase) throw new Error('The database is not configured.');
+
+    // Get the current user so we can skip a no-op email change.
+    // Supabase throws "email is invalid" when you try to set the
+    // same email that's already on the account.
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const newEmail = email?.trim().toLowerCase();
+    const currentEmail = currentUser?.email?.toLowerCase();
+
     const updates = {};
-    if (email?.trim()) updates.email = email.trim();
+    if (newEmail && newEmail !== currentEmail) updates.email = newEmail;
     if (password) updates.password = password;
+
     if (Object.keys(updates).length === 0) {
-      throw new Error('Enter a new email or password.');
+      // Nothing actually changed — treat as success silently.
+      return currentUser;
     }
+
     // The DB trigger `on_auth_user_email_updated` automatically syncs
     // the email to the admin_users table — no manual update needed here.
     const { data, error } = await supabase.auth.updateUser(updates);

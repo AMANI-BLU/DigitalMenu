@@ -512,7 +512,7 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
       setCredentialsError(t('passwordTooShort'));
       return;
     }
-    const isChangingEmail = Boolean(credentials.email.trim());
+    const isChangingEmail = Boolean(credentials.email.trim()) && credentials.email.trim().toLowerCase() !== adminEmail?.toLowerCase();
     setCredentialsSaving(true);
     try {
       await onUpdateCredentials({ email: credentials.email, password: credentials.password });
