@@ -512,11 +512,18 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
       setCredentialsError(t('passwordTooShort'));
       return;
     }
+    const isChangingEmail = Boolean(credentials.email.trim());
     setCredentialsSaving(true);
     try {
       await onUpdateCredentials({ email: credentials.email, password: credentials.password });
       setCredentials({ email: '', password: '', confirmPassword: '' });
-      setCredentialsMessage(t('credentialsUpdated'));
+      // Supabase holds email changes pending confirmation by default.
+      // Show a specific message so the admin knows to check their inbox.
+      setCredentialsMessage(
+        isChangingEmail
+          ? '✉️ Confirmation email sent to the new address — click the link to apply the change. Password was updated immediately.'
+          : t('credentialsUpdated')
+      );
     } catch (credentialError) {
       setCredentialsError(credentialError.message || t('credentialsUpdateFailed'));
     } finally {
