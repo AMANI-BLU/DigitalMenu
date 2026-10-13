@@ -47,6 +47,49 @@ create trigger on_auth_user_email_updated
   execute function public.sync_admin_user_email();
 
 -- ============================================================
+-- RPC: update_admin_email
+-- Updates auth.users.email directly (bypasses Supabase's email
+-- confirmation flow). Only callable by an authenticated admin.
+-- Also syncs admin_users.email in the same transaction.
+-- ============================================================
+create or replace function public.update_admin_email(new_email text)
+returns void
+language plpgsql
+security definer
+set search_path = auth, public
+as $$
+begin
+  -- Guard: caller must be a registered admin.
+  if not exists (
+    select 1 from public.admin_users where id = auth.uid()
+  ) then
+    raise exception 'Access denied: not an admin user';
+  end if;
+
+  -- Update the email directly in auth.users, clearing any pending
+  -- email-change state so there is nothing left to confirm.
+  update auth.users
+  set
+    email              = new_email,
+    email_confirmed_at = coalesce(email_confirmed_at, now()),
+    email_change       = '',
+    email_change_token_new = '',
+    email_change_confirm_status = 0,
+    updated_at         = now()
+  where id = auth.uid();
+
+  -- Keep admin_users in sync (trigger covers this too, but belt-and-braces).
+  update public.admin_users
+  set email = new_email
+  where id = auth.uid();
+end;
+$$;
+
+-- Grant execute to authenticated users (RLS + admin guard inside the fn).
+grant execute on function public.update_admin_email(text) to authenticated;
+
+
+-- ============================================================
 -- OTHER TABLES
 -- ============================================================
 create table if not exists public.categories (

@@ -137,46 +137,38 @@ export const supabaseService = {
     }
 
     const newEmail = email?.trim().toLowerCase();
+    const isChangingEmail = Boolean(newEmail && newEmail !== currentEmail);
+    const isChangingPassword = Boolean(password);
 
-    const updates = {};
-    // Only include email in the update if it is genuinely different.
-    if (newEmail && newEmail !== currentEmail) {
-      updates.email = newEmail;
-    }
-    if (password) {
-      updates.password = password;
+    if (!isChangingEmail && !isChangingPassword) {
+      return null; // Nothing to do.
     }
 
-    // Nothing to change — return silently without hitting Supabase.
-    if (Object.keys(updates).length === 0) {
-      return null;
-    }
-
-    const { data, error } = await supabase.auth.updateUser(updates);
-
-    if (error) {
-      const msg = error.message || '';
-      if (msg.toLowerCase().includes('invalid') && msg.includes('@')) {
-        throw new Error(
-          'That email address is already your current email. Enter a different one, or leave the email field empty to change only the password.'
-        );
+    // ── Email change ────────────────────────────────────────────────────────
+    // Call our SECURITY DEFINER RPC which writes directly to auth.users,
+    // bypassing Supabase's email confirmation flow entirely.
+    if (isChangingEmail) {
+      const { error: rpcError } = await supabase.rpc('update_admin_email', {
+        new_email: newEmail,
+      });
+      if (rpcError) {
+        throw new Error(rpcError.message || 'Failed to update email.');
       }
-      throw error;
     }
 
-    // Manually sync the email to admin_users as a reliable fallback.
-    // The DB trigger handles this automatically, but if it hasn't fired yet
-    // (e.g. timing issue or trigger misconfiguration), this ensures consistency.
-    if (updates.email && currentUserId) {
-      await supabase
-        .from('admin_users')
-        .update({ email: updates.email })
-        .eq('id', currentUserId);
-      // Intentionally ignore errors here — the trigger is the primary sync mechanism.
+    // ── Password change ─────────────────────────────────────────────────────
+    // Password changes go through auth.updateUser (no confirmation needed).
+    let updatedUser = null;
+    if (isChangingPassword) {
+      const { data, error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      updatedUser = data.user;
     }
 
-    return data.user;
+    // Return a user-like object that always carries the correct current email.
+    return { ...(updatedUser || {}), email: isChangingEmail ? newEmail : currentEmail };
   },
+
 
 
   async getCategories() {
