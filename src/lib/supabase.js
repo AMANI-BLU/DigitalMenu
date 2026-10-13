@@ -127,9 +127,11 @@ export const supabaseService = {
 
     // Fetch the live current email from Supabase Auth.
     let currentEmail = '';
+    let currentUserId = '';
     try {
       const { data: { user } } = await supabase.auth.getUser();
       currentEmail = user?.email?.trim().toLowerCase() || '';
+      currentUserId = user?.id || '';
     } catch (_) {
       // getUser failed — proceed without the comparison guard.
     }
@@ -150,14 +152,9 @@ export const supabaseService = {
       return null;
     }
 
-    // The DB trigger `on_auth_user_email_updated` automatically syncs
-    // the email to the admin_users table — no manual update needed here.
     const { data, error } = await supabase.auth.updateUser(updates);
 
     if (error) {
-      // Supabase returns a cryptic "email is invalid" when the submitted
-      // email is the same as the current one (race condition / stale state).
-      // Translate it into something useful.
       const msg = error.message || '';
       if (msg.toLowerCase().includes('invalid') && msg.includes('@')) {
         throw new Error(
@@ -166,8 +163,21 @@ export const supabaseService = {
       }
       throw error;
     }
+
+    // Manually sync the email to admin_users as a reliable fallback.
+    // The DB trigger handles this automatically, but if it hasn't fired yet
+    // (e.g. timing issue or trigger misconfiguration), this ensures consistency.
+    if (updates.email && currentUserId) {
+      await supabase
+        .from('admin_users')
+        .update({ email: updates.email })
+        .eq('id', currentUserId);
+      // Intentionally ignore errors here — the trigger is the primary sync mechanism.
+    }
+
     return data.user;
   },
+
 
   async getCategories() {
     if (!supabase) return [];
