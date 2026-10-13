@@ -20,6 +20,53 @@ const throwIfError = ({ data, error }) => {
   return data;
 };
 
+/**
+ * Maps raw backend error messages to friendly, user-readable strings.
+ * Never exposes the word "Supabase", error codes, or internal field names.
+ */
+const translateAuthError = (error) => {
+  const raw = (error?.message || '').toLowerCase();
+
+  // ── Email errors ───────────────────────────────────────────────────────
+  if (raw.includes('user already registered') || raw.includes('already been registered') || raw.includes('email address is already') || raw.includes('duplicate') || raw.includes('unique') && raw.includes('email'))
+    return 'That email address is already in use by another account.';
+  if (raw.includes('invalid email') || raw.includes('email is invalid') || raw.includes('unable to validate email'))
+    return 'Please enter a valid email address.';
+  if (raw.includes('email rate limit') || raw.includes('email sending'))
+    return 'Too many changes in a short time. Please wait a few minutes and try again.';
+
+  // ── Password errors ────────────────────────────────────────────────────
+  if (raw.includes('password should be different') || raw.includes('same as the old password'))
+    return 'Your new password must be different from your current one.';
+  if (raw.includes('password should be at least') || raw.includes('password is too short') || raw.includes('weak password'))
+    return 'Password must be at least 8 characters long.';
+  if (raw.includes('passwords do not match'))
+    return 'Passwords do not match. Please re-enter them.';
+
+  // ── Auth / session errors ──────────────────────────────────────────────
+  if (raw.includes('invalid login credentials') || raw.includes('invalid credentials'))
+    return 'Incorrect email or password. Please try again.';
+  if (raw.includes('email not confirmed'))
+    return 'This account has not been verified yet. Please contact your administrator.';
+  if (raw.includes('user not found'))
+    return 'No account was found with that email address.';
+  if (raw.includes('too many requests') || raw.includes('rate limit'))
+    return 'Too many attempts. Please wait a moment before trying again.';
+  if (raw.includes('session') || raw.includes('not authenticated') || raw.includes('jwt'))
+    return 'Your session has expired. Please sign out and sign back in.';
+  if (raw.includes('access denied') || raw.includes('not an admin'))
+    return 'Access denied. You do not have permission to perform this action.';
+
+  // ── Network / connectivity ─────────────────────────────────────────────
+  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request failed'))
+    return 'Unable to connect. Please check your internet connection and try again.';
+  if (raw.includes('timeout'))
+    return 'The request timed out. Please try again.';
+
+  // ── Fallback ───────────────────────────────────────────────────────────
+  return 'Something went wrong. Please try again or contact support if the problem continues.';
+};
+
 const isMissingRelation = (error, relation) => Boolean(
   error && (
     error.code === 'PGRST205' ||
@@ -123,17 +170,15 @@ export const supabaseService = {
   },
 
   async updateAdminCredentials({ email, password }) {
-    if (!supabase) throw new Error('The database is not configured.');
+    if (!supabase) throw new Error('The app is not connected to the database. Please contact support.');
 
-    // Fetch the live current email from Supabase Auth.
+    // Fetch the live current email.
     let currentEmail = '';
-    let currentUserId = '';
     try {
       const { data: { user } } = await supabase.auth.getUser();
       currentEmail = user?.email?.trim().toLowerCase() || '';
-      currentUserId = user?.id || '';
     } catch (_) {
-      // getUser failed — proceed without the comparison guard.
+      // proceed without the guard
     }
 
     const newEmail = email?.trim().toLowerCase();
@@ -141,31 +186,25 @@ export const supabaseService = {
     const isChangingPassword = Boolean(password);
 
     if (!isChangingEmail && !isChangingPassword) {
-      return null; // Nothing to do.
+      return null;
     }
 
     // ── Email change ────────────────────────────────────────────────────────
-    // Call our SECURITY DEFINER RPC which writes directly to auth.users,
-    // bypassing Supabase's email confirmation flow entirely.
     if (isChangingEmail) {
       const { error: rpcError } = await supabase.rpc('update_admin_email', {
         new_email: newEmail,
       });
-      if (rpcError) {
-        throw new Error(rpcError.message || 'Failed to update email.');
-      }
+      if (rpcError) throw new Error(translateAuthError(rpcError));
     }
 
     // ── Password change ─────────────────────────────────────────────────────
-    // Password changes go through auth.updateUser (no confirmation needed).
     let updatedUser = null;
     if (isChangingPassword) {
       const { data, error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      if (error) throw new Error(translateAuthError(error));
       updatedUser = data.user;
     }
 
-    // Return a user-like object that always carries the correct current email.
     return { ...(updatedUser || {}), email: isChangingEmail ? newEmail : currentEmail };
   },
 

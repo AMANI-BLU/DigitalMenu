@@ -507,38 +507,67 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
     setCredentialsError('');
     setCredentialsMessage('');
 
-    const newEmail = credentials.email.trim().toLowerCase();
-    const currentEmail = adminEmail?.toLowerCase();
+    const newEmail    = credentials.email.trim().toLowerCase();
+    const newPassword = credentials.password;
+    const confirmPw   = credentials.confirmPassword;
+    const currentEmail = adminEmail?.trim().toLowerCase();
 
-    // Catch same-email submissions before hitting Supabase.
-    if (newEmail && newEmail === currentEmail) {
-      setCredentialsError('That is already your current email address. Enter a different one.');
+    // ── Client-side validation ─────────────────────────────────────────────
+    if (!newEmail && !newPassword) {
+      setCredentialsError('Please enter a new email address, a new password, or both.');
       return;
     }
-    if (credentials.password && credentials.password !== credentials.confirmPassword) {
-      setCredentialsError(t('passwordsDoNotMatch'));
-      return;
+
+    if (newEmail) {
+      // Basic email format check.
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newEmail)) {
+        setCredentialsError('Please enter a valid email address (e.g. you@example.com).');
+        return;
+      }
+      if (newEmail === currentEmail) {
+        setCredentialsError('That is already your current email address. Enter a different one.');
+        return;
+      }
     }
-    if (credentials.password && credentials.password.length < 8) {
-      setCredentialsError(t('passwordTooShort'));
-      return;
+
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        setCredentialsError('Password must be at least 8 characters long.');
+        return;
+      }
+      if (newPassword !== confirmPw) {
+        setCredentialsError('Passwords do not match. Please re-enter them carefully.');
+        return;
+      }
     }
-    if (!newEmail && !credentials.password) {
-      setCredentialsError('Enter a new email or a new password.');
-      return;
-    }
-    const isChangingEmail = Boolean(newEmail);
+
+    const isChangingEmail    = Boolean(newEmail);
+    const isChangingPassword = Boolean(newPassword);
+
     setCredentialsSaving(true);
     try {
-      await onUpdateCredentials({ email: credentials.email, password: credentials.password });
+      await onUpdateCredentials({ email: credentials.email, password: newPassword });
       setCredentials({ email: '', password: '', confirmPassword: '' });
-      setCredentialsMessage(isChangingEmail ? '✅ Email updated successfully.' : t('credentialsUpdated'));
-    } catch (credentialError) {
-      setCredentialsError(credentialError.message || t('credentialsUpdateFailed'));
+
+      // Build a clear, specific success message.
+      let msg = '';
+      if (isChangingEmail && isChangingPassword) {
+        msg = '✅ Email and password updated successfully.';
+      } else if (isChangingEmail) {
+        msg = '✅ Email updated successfully.';
+      } else {
+        msg = '✅ Password updated successfully.';
+      }
+      setCredentialsMessage(msg);
+    } catch (err) {
+      // Error messages are already translated to friendly text by the service layer.
+      setCredentialsError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setCredentialsSaving(false);
     }
   };
+
   return (
     <>
       <PageHeading eyebrow={t('storefrontSetup')} title={t('storefrontSetup')} description={t('profileDescription')} />
