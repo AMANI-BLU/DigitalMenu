@@ -23,8 +23,19 @@ export default function AdminLogin({ onAuthenticated, onCancel, mode = 'light', 
       const nextSession = await supabaseService.signInAdmin(email.trim(), password);
       await onAuthenticated(nextSession);
     } catch (loginError) {
-      const isInvalidCredentials = loginError.message?.toLowerCase().includes('invalid login credentials');
-      setError(isInvalidCredentials ? t('adminInvalidCredentials') : (loginError.message || t('adminAccessDenied')));
+      const rawMessage = loginError.message?.toLowerCase() || '';
+      const isInvalidCredentials = rawMessage.includes('invalid login credentials') || rawMessage.includes('invalid credentials') || rawMessage.includes('incorrect email or password');
+      const isAccessDenied = rawMessage.includes('not allowed to access the admin dashboard') || rawMessage.includes('access denied');
+      const isNotConfigured = rawMessage.includes('database is not configured');
+      setError(
+        isInvalidCredentials
+          ? t('adminInvalidCredentials')
+          : isAccessDenied
+            ? t('adminAccessDenied')
+            : isNotConfigured
+              ? t('databaseNotConfigured')
+              : t('adminSignInError'),
+      );
     } finally {
       setSubmitting(false);
     }

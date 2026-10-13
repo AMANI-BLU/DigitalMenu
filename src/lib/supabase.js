@@ -138,7 +138,7 @@ export const supabaseService = {
   async signInAdmin(email, password) {
     if (!supabase) throw new Error('The database is not configured.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) throw new Error(translateAuthError(error));
 
     const { data: adminUser, error: adminError } = await supabase
       .from('admin_users')
