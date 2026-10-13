@@ -208,13 +208,16 @@ export default function App() {
   };
 
   const handleUpdateCredentials = async (credentials) => {
-    const user = await supabaseService.updateAdminCredentials(credentials);
-    // Force-refresh the session so the new email is reflected immediately
-    // (getSession() returns a cached value; refreshSession() hits the server).
-    const refreshed = await supabaseService.refreshSession();
-    if (refreshed) setSession(refreshed);
-    return user;
+    const updatedUser = await supabaseService.updateAdminCredentials(credentials);
+    if (updatedUser) {
+      // auth.updateUser() returns the updated user immediately (confirmation is disabled).
+      // Patch the session in-place so the displayed email reflects the change right away,
+      // without depending on refreshSession() which can return a stale cached token.
+      setSession((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
+    }
+    return updatedUser;
   };
+
 
   const handleAddReview = async (review) => {
     try {
