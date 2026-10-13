@@ -209,8 +209,9 @@ export default function App() {
 
   const handleUpdateCredentials = async (credentials) => {
     const user = await supabaseService.updateAdminCredentials(credentials);
-    // Refresh the session so the displayed email updates immediately.
-    const refreshed = await supabaseService.getSession();
+    // Force-refresh the session so the new email is reflected immediately
+    // (getSession() returns a cached value; refreshSession() hits the server).
+    const refreshed = await supabaseService.refreshSession();
     if (refreshed) setSession(refreshed);
     return user;
   };
@@ -301,6 +302,7 @@ export default function App() {
           bankAccounts={bankAccounts}
           menuVisible={store.menuVisible !== false}
           adminEmail={session?.user?.email || ''}
+          adminPendingEmail={''}
           onSaveMenuItem={handleSaveMenuItem}
           onDeleteMenuItem={handleDeleteMenuItem}
           onToggleMenuItemAvailability={handleToggleMenuItemAvailability}

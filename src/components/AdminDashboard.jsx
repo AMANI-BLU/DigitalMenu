@@ -95,6 +95,7 @@ export default function AdminDashboard({
   bankAccounts = [],
   menuVisible = true,
   adminEmail = '',
+  adminPendingEmail = '',
   onSaveMenuItem,
   onDeleteMenuItem,
   onToggleMenuItemAvailability,
@@ -257,6 +258,7 @@ export default function AdminDashboard({
                 onSave={onUpdateSettings}
                 onPreview={onPreviewSettings}
                 adminEmail={adminEmail}
+                adminPendingEmail={adminPendingEmail}
                 onUpdateCredentials={onUpdateCredentials}
                 onToggleMenuVisibility={onToggleMenuVisibility}
               />
@@ -475,7 +477,7 @@ function handleImageUpload(event, setForm) {
   reader.readAsDataURL(file);
 }
 
-function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onSave, onPreview, adminEmail, onUpdateCredentials, onToggleMenuVisibility }) {
+function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onSave, onPreview, adminEmail, adminPendingEmail, onUpdateCredentials, onToggleMenuVisibility }) {
   const [form, setForm] = useState({ restaurantName, tagline, theme, mode });
   const [saving, setSaving] = useState(false);
   const [credentials, setCredentials] = useState({ email: '', password: '', confirmPassword: '' });
@@ -599,6 +601,11 @@ function SettingsTab({ t, theme, mode, restaurantName, tagline, menuVisible, onS
           <h2 className="text-lg font-black text-slate-950">{t('accountSecurity')}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">{t('accountSecurityDescription')}</p>
           <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{t('currentAdminEmail')}: {adminEmail || t('notAvailable')}</p>
+          {adminPendingEmail && (
+            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-700">
+              ⏳ Email change pending — check <strong>{adminPendingEmail}</strong> and click the confirmation link to activate it.
+            </p>
+          )}
           <div className="mt-5 space-y-4">
             <label><span className="field-label">{t('newAdminEmail')}</span><input type="email" autoComplete="off" className={inputClass} value={credentials.email} onChange={(e) => setCredentials({ ...credentials, email: e.target.value })} placeholder="Enter new email address" /></label>
             <label><span className="field-label">{t('newAdminPassword')}</span><input type="password" autoComplete="new-password" minLength="8" className={inputClass} value={credentials.password} onChange={(e) => setCredentials({ ...credentials, password: e.target.value })} /></label>

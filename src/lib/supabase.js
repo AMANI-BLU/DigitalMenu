@@ -81,6 +81,13 @@ export const supabaseService = {
     return data.session;
   },
 
+  async refreshSession() {
+    if (!supabase) return null;
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    return data.session;
+  },
+
   async signInAdmin(email, password) {
     if (!supabase) throw new Error('The database is not configured.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
