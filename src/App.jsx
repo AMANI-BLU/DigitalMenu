@@ -209,12 +209,22 @@ export default function App() {
 
   const handleUpdateCredentials = async (credentials) => {
     const updatedUser = await supabaseService.updateAdminCredentials(credentials);
-    if (updatedUser) {
-      // auth.updateUser() returns the updated user immediately (confirmation is disabled).
-      // Patch the session in-place so the displayed email reflects the change right away,
-      // without depending on refreshSession() which can return a stale cached token.
-      setSession((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
-    }
+    // If the call succeeded (no error thrown), we know what was set.
+    // Force the submitted email into session state directly — the object returned
+    // by auth.updateUser() sometimes still carries the old email (Supabase quirk),
+    // so we cannot rely on it alone.
+    setSession((prev) => {
+      if (!prev) return prev;
+      const submittedEmail = credentials.email?.trim().toLowerCase();
+      return {
+        ...prev,
+        user: {
+          ...prev.user,
+          ...(updatedUser || {}),
+          ...(submittedEmail ? { email: submittedEmail } : {}),
+        },
+      };
+    });
     return updatedUser;
   };
 
